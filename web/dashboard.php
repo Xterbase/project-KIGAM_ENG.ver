@@ -43,7 +43,7 @@ if ($meta === null || $inspect === null) {
     <ul class="tree" id="tree">
       <li class="pill" id="pill" aria-hidden="true"></li>
       <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
-        <div class="sub"><ul><li><a href="#file">File layout</a></li><li><a href="#upfile">Upload another file</a></li><li><a href="#uplist">Samples</a></li></ul></div></li>
+        <div class="sub"><ul><li><a href="#file">File layout</a></li><li><a href="#uplist">Recent uploads</a></li></ul></div></li>
       <li data-v="signal"><a class="tab" href="#signal"><span class="dot"></span>Signal analysis<span class="num">02</span></a>
         <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings · SAR</a></li></ul></div></li>
       <li data-v="dash"><a class="tab" href="#dash"><span class="dot"></span>Dashboard<span class="num">03</span></a>
@@ -63,16 +63,8 @@ if ($meta === null || $inspect === null) {
       <h3>Discs</h3>
       <div class="tablewrap"><table id="discs"></table></div>
 
-      <h3 id="upfile">Upload another file</h3>
-      <!-- index.php handles the upload (save → inspect → redirect to the new dashboard). -->
-      <form method="post" action="./" enctype="multipart/form-data" id="upForm">
-        <label class="drop" id="drop">
-          <input type="file" name="bin" accept=".bin,.BIN,.rda,.rdata,.RData" hidden>
-          <b>Drop a BIN / RDA file here</b><span class="note">or click to choose · after upload the file layout is read and the new dashboard opens (a few seconds)</span>
-        </label>
-      </form>
-
-      <h3 id="uplist">Samples</h3>
+      <h3 id="uplist">Recent uploads</h3>
+      <!-- Uploading a new file happens only on index.php. This list only reopens files already uploaded. -->
       <?php sample_table(list_samples(), $id); ?>
     </section>
 
@@ -161,7 +153,6 @@ if ($meta === null || $inspect === null) {
     JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
 ) ?></script>
 <script src="assets/vendor/plotly-basic-2.35.2.min.js"></script>
-<script src="assets/drop.js"></script>
 <script src="assets/app.js"></script>
 <?php endif; ?>
 </body>
