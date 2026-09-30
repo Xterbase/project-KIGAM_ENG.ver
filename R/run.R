@@ -17,7 +17,9 @@
 #   curve          path, position, record_index, grain?, mode?
 #   sar            path, positions, signal_integral, background_integral, mode?, seed?, progress_file?
 #   dose_response  path, position, signal_integral, background_integral, grain?, mode?, seed?
-#   age_model      de, de_error, sigmab, model?, max_k?
+#   age_model      de, de_error, sigmab, model?, max_k?, selection?
+#                  selection = per-unit verdicts [{position, grain, auto, final}] — not used in the calculation;
+#                  kept as-is in the result (records which units a person overturned).
 #
 # PHP must pass user input only through this JSON file, never spliced into a shell string.
 
@@ -167,7 +169,8 @@ suppressPackageStartupMessages({
       fmm_error = r$fmm_error,
       recommendation = rec,
       model_source = r$model_source,
-      result = res
+      result = res,
+      selection = a$selection
     )
   }
 )

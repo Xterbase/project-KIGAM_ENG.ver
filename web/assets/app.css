@@ -128,15 +128,6 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 label { display: inline-flex; align-items: center; gap: 8px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
 
-/* Segmented control (measurement mode A/B): a white thumb (.thumb) slides to the chosen cell like a spring */
-.seg { position: relative; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: #e3e6e5; border-radius: 12px; padding: 3px; }
-.seg .thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; border-radius: 10px; background: var(--bone-white);
-  box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.06); transition: transform .45s var(--spring), width .45s var(--spring); }
-.seg button { position: relative; z-index: 1; box-shadow: none; background: none; border-radius: 10px; padding: 8px 20px; color: var(--slate-smoke);
-  font-weight: 400; white-space: nowrap; transition: color .25s; }
-.seg button:hover { background: none; color: var(--forest-ink); }
-.seg button.on { color: var(--forest-ink); font-weight: 500; }
-
 /* Filled buttons (dashboard): shrink slightly when pressed, then bounce back */
 button.btn { background: var(--mist); box-shadow: none; transition: transform .35s var(--spring), background .2s, opacity .2s; }
 button.btn:hover { background: #e6eae8; }

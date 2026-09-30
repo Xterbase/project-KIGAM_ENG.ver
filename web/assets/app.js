@@ -6,6 +6,7 @@
 const B = JSON.parse(document.getElementById('boot').textContent);
 const I = B.inspect;
 const SG = I.single_grain;
+const MODE = SG ? 'single_grain' : 'single_aliquot';   // the measurement mode is detected from the file (GRAIN numbers present or not); not switchable on screen
 
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const C = {
@@ -237,11 +238,13 @@ const recsOf = (p, g) => I.records.filter(r => r.position == p && r.grain == g);
 const firstOsl = (p, g) => recsOf(p, g).find(r => r.ltype !== 'TL');   // SAR's natural signal (first OSL/IRSL record)
 const NCH = Math.max(...I.records.filter(r => r.ltype !== 'TL').map(r => r.npoints));
 
-let run = null;   // the last SAR run: { mode, sig, bg, sar, age, meta }
+// Last De calculation: { mode, sig, bg, sar, dec, age, meta }. dec[i] = final verdict of unit i (true = Accept).
+// Starts from the automatic QC verdict and is changed with the Accept/Reject buttons. Recalculating resets it to the new automatic verdict.
+let run = null;
 let sel = 0, selToken = 0;
 
 // ---- Tabs: driven by the address #name (back button and shared links work). Sub-items (#file, #sigrun …) open their tab, then scroll there.
-const TABS = ['upload', 'signal', 'dash', 'model'], OLD = { file: 'upload', dist: 'dash' };   // old addresses (#file, #dist) are still accepted
+const TABS = ['upload', 'calc', 'model'], OLD = { file: 'upload', dist: 'calc', signal: 'calc', dash: 'calc' };   // old addresses are still accepted
 const tabItems = [...document.querySelectorAll('#tree > li[data-v]')];
 let tab = null;
 function go(id) {
@@ -255,11 +258,10 @@ function go(id) {
   $('pill').style.height = (tabItems[0].querySelector('.tab').offsetHeight + tabItems[i].querySelector('.sub > ul').scrollHeight) + 'px';
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === v));
   document.querySelectorAll('.sub a').forEach(a => a.classList.toggle('cur', a.getAttribute('href') === '#' + id));
-  if (v === 'signal') requestAnimationFrame(syncSeg);   // the button widths could not be measured while hidden
   if (v !== tab) {
     tab = v;
     requestAnimationFrame(() => document.querySelectorAll('#' + v + ' .plot').forEach(p => { if (window.Plotly && p.data) Plotly.Plots.resize(p); }));
-    if (v === 'dash' && run) drawRadial(U()[sel]);   // the radial plot must recompute its arcs for the area size
+    if (v === 'calc' && run) drawRadial(U()[sel]);   // the radial plot must recompute its arcs for the area size
   }
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -268,7 +270,7 @@ window.addEventListener('hashchange', () => go(location.hash.slice(1)));
 // ---- Analysis conditions at the top (always shows the conditions a result came from)
 function renderContext() {
   const m = run ? run.meta : B.meta, box = $('context'); box.replaceChildren();
-  [['Sample file', B.file], ['Measurement mode', run ? MODE_LABEL[run.mode] : 'not analysed'],
+  [['Sample file', B.file], ['Measurement mode', MODE_LABEL[MODE]],
    ['Signal integral', run ? run.sig + ' (channels)' : '—'], ['Background integral', run ? run.bg + ' (channels)' : '—'],
    ['sigmab', run ? SIGMAB[run.mode] : '—'], ['Run time', run ? run.secs + ' s' : '—'], ['Unit', 'seconds (s) · no dose rate entered'],
    ['Analysis package', `Luminescence ${m.luminescence_version} · R ${m.r_version}`]]
@@ -336,69 +338,86 @@ async function showSignal() {
 // Integrals are entered as two numbers (start · end). R still receives the "start:end" string.
 const rangeVal = id => $(id + '1').value + ':' + $(id + '2').value;
 function drawSignal() { if (sigCurve) drawCurve('curvePlot', sigCurve.c, sigCurve.text, parseRange(rangeVal('sig')), parseRange(rangeVal('bg'))); }
+// If the integrals change while results are shown, say that the results below use the previous integrals.
+function markStale() {
+  const stale = !!run && (rangeVal('sig') !== run.sig || rangeVal('bg') !== run.bg);
+  $('staleNote').hidden = !stale;
+  if (stale) $('staleNote').textContent = `Integrals changed · results below use the previous integrals (signal ${run.sig}, background ${run.bg}) · press Calculate De again to update`;
+}
 selPos.onchange = fillGrains; selGrain.onchange = fillRecs; selRec.onchange = showSignal;
 ['sig1', 'sig2', 'bg1', 'bg2'].forEach((id, k, ids) => {
-  const inp = $(id); inp.max = NCH; inp.oninput = drawSignal;
+  const inp = $(id); inp.max = NCH; inp.oninput = () => { drawSignal(); markStale(); };
   // Typing ':' (or space) out of habit moves to the end field
   if (k % 2 === 0) inp.onkeydown = e => { if (e.key === ':' || e.key === ' ') { e.preventDefault(); $(ids[k + 1]).focus(); } };
 });
 
-// ---- 02 Analysis settings: measurement mode + integrals → SAR → age model
-let formMode = SG ? 'single_grain' : 'single_aliquot';
-Object.entries(MODE_LABEL).forEach(([m, label]) => {
-  const b = el('button', label); b.type = 'button'; b.dataset.mode = m;
-  if (m === 'single_grain' && !SG) { b.disabled = true; b.title = 'No GRAIN numbers in this file, so Single grain analysis is unavailable'; }
-  b.onclick = () => { formMode = m; syncSeg(); };
-  $('modeSeg').append(b);
-});
-function syncSeg() {
-  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === formMode));
-  const b = document.querySelector('#modeSeg button.on'), t = document.querySelector('#modeSeg .thumb');
-  if (b && b.offsetWidth) { t.style.width = b.offsetWidth + 'px'; t.style.transform = `translateX(${b.offsetLeft - 3}px)`; }
-}
+// ---- 02 Analysis settings: integrals → SAR (De calculation) → age model
+$('modeVal').textContent = MODE_LABEL[MODE] + ' · detected from the file';
 $('runHint').textContent = `Channels 1–${NCH}. Enter only the start and end channel numbers (e.g. 6 : 10). Typed values show as coloured bands on the curve above. `
-  + 'Single grain gives one De per grain; Single aliquot sums the grain signals of a disc and gives one De per disc.'
-  + (SG ? '' : ' This file allows Single aliquot only.');
+  + (SG ? 'One De per grain.' : 'One De per disc.');
+
+// Age model: uses only De whose final verdict is Accept. Per-unit automatic and final verdicts are sent too and kept in the result file (age_model.json).
+async function ageModel() {
+  const units = U(), acc = units.filter((_, i) => run.dec[i]);
+  const selection = units.map((u, i) => ({ position: u.position, grain: u.grain ?? null,
+    auto: AUTO(u) ? 'accept' : 'reject', final: run.dec[i] ? 'accept' : 'reject' }));
+  try {
+    return { ok: true, ...(await api('age_model', { de: acc.map(u => u.de), de_error: acc.map(u => u.de_error), sigmab: SIGMAB[run.mode], selection })).result };
+  } catch (err) { return { ok: false, error: err.message }; }
+}
+// Calling on every change would start R many times during rapid clicking, so recalculate once, 0.6 s after the last change.
+let ageTimer = 0, ageToken = 0;
+function refreshAge() {
+  clearTimeout(ageTimer);
+  const token = ++ageToken;
+  ageTimer = setTimeout(async () => {
+    const age = await ageModel();
+    if (token !== ageToken) return;
+    run.age = age; renderModel(); drawRadial(U()[sel]);
+  }, 600);
+}
 
 $('runForm').onsubmit = async e => {
   e.preventDefault();
-  const sig = rangeVal('sig'), bg = rangeVal('bg'), mode = formMode;
+  const sig = rangeVal('sig'), bg = rangeVal('bg'), mode = MODE;
   const bad = [parseRange(sig), parseRange(bg)].some(r => !r || r[0] < 1 || r[1] > NCH || r[0] > r[1]);
   if (bad) { $('runStatus').textContent = `Integrals must lie within 1–${NCH}, with start not greater than end.`; return; }
 
   $('runBtn').disabled = true;
-  const t0 = Date.now(), tick = setInterval(() => { $('runStatus').textContent = `Running SAR · ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);
+  clearTimeout(ageTimer); ageToken++;   // drop model calculations still pending from verdict changes on the previous result
+  const t0 = Date.now(), tick = setInterval(() => { $('runStatus').textContent = `Calculating De · ${Math.round((Date.now() - t0) / 1000)} s`; }, 500);
   try {
     const s = await api('sar', { positions: arr(I.positions), signal_integral: sig, background_integral: bg, mode });
-    const acc = s.result.units.filter(u => u.rc_status === 'OK' && u.de != null);
-    let age;
-    try {
-      age = { ok: true, ...(await api('age_model', { de: acc.map(u => u.de), de_error: acc.map(u => u.de_error), sigmab: SIGMAB[mode] })).result };
-    } catch (err) { age = { ok: false, error: err.message }; }
+    const dec = s.result.units.map(AUTO);
+    run = { mode, sig, bg, sar: s.result, dec, age: null, meta: s.meta };
+    run.age = await ageModel();
     // Run time: from the button press until the SAR + age-model responses arrive (includes R start-up on the server; the time the user waited)
-    run = { mode, sig, bg, sar: s.result, age, meta: s.meta, secs: ((Date.now() - t0) / 1000).toFixed(1) };
-    $('runStatus').textContent = `Done · ${s.result.n_success}/${s.result.n_requested} analysed, ${acc.length} passed QC · ${run.secs} s`;
+    run.secs = ((Date.now() - t0) / 1000).toFixed(1);
+    $('runStatus').textContent = `Done · ${s.result.n_success}/${s.result.n_requested} analysed, ${dec.filter(Boolean).length} passed QC · ${run.secs} s`;
     renderRun();
-    location.hash = '#dash';
+    $('dresult').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
-    $('runStatus').textContent = 'SAR failed: ' + err.message;
+    $('runStatus').textContent = 'De calculation failed: ' + err.message;
   } finally { clearInterval(tick); $('runBtn').disabled = false; }
 };
 
-// ---- 03 De distribution: choosing one unit updates the four charts, the map and the table together
+// ---- De distribution: choosing one unit updates the four charts, the map and the table together
 const U = () => run.sar.units;
 const unitLabel = u => run.mode === 'single_grain' ? `Disc ${u.position} · grain ${u.grain}` : `Disc ${u.position}`;
+const DEC = ok => ok ? ['● Accept', 'ok'] : ['✕ Reject', 'no'];
+const AUTO = u => u.rc_status === 'OK' && u.de != null;   // automatic verdict: passed QC and has a De
 
 function renderRun() {
-  renderContext();
-  $('distEmpty').hidden = true; $('distBody').hidden = false;
+  renderContext(); markStale();
+  $('distBody').hidden = false;
+  go(tab);   // refresh the done marks in the tab list
   const md = $('mapDisc'); md.replaceChildren();
   if (run.mode === 'single_grain') [...new Set(U().map(u => u.position))].forEach(p => md.append(new Option('Disc ' + p, p)));
   md.hidden = run.mode !== 'single_grain';
   const f = arr(run.sar.failed);
   $('failedNote').textContent = f.length ? `${f.length} failed to analyse (not in the table): ` + f.map(x => (run.mode === 'single_grain' ? `disc ${x.position} grain ${x.grain}` : `disc ${x.position}`) + ` — ${x.reason}`).join(' / ') : '';
   renderModel();
-  const first = U().findIndex(u => u.rc_status === 'OK');
+  const first = run.dec.indexOf(true);
   sel = first >= 0 ? first : 0;
   renderTable();
   select(sel);
@@ -407,12 +426,16 @@ function renderRun() {
 function select(i) {
   const units = U(); if (!units.length) return;
   sel = Math.max(0, Math.min(units.length - 1, i));
-  const u = units[sel], pass = u.rc_status === 'OK', token = ++selToken;
+  const u = units[sel], pass = AUTO(u), ok = run.dec[sel], token = ++selToken;
   $('selTitle').textContent = unitLabel(u);
-  $('selDetail').replaceChildren(el('span', `De ${fmt(u.de)} ± ${fmt(u.de_error)} s · `), el('span', pass ? '● Pass' : '✕ Fail', pass ? 'ok' : 'no'),
-    el('span', ` · Recycling ${fmt(u.recycling_ratio, 3)}` + (u.warning ? ' · has warning' : '')));
+  $('selDetail').replaceChildren(el('span', `De ${fmt(u.de)} ± ${fmt(u.de_error)} s · `), el('span', ...DEC(ok)),
+    el('span', (ok === pass ? ' · as automatic verdict' : ` · changed by hand (automatic verdict ${pass ? 'Accept' : 'Reject'})`)
+      + ` · Recycling ${fmt(u.recycling_ratio, 3)}` + (u.warning ? ' · has warning' : '')));
   $('prevBtn').disabled = sel === 0;
   $('nextBtn').disabled = sel === units.length - 1;
+  $('accBtn').classList.toggle('primary', ok); $('rejBtn').classList.toggle('primary', !ok);
+  $('accBtn').disabled = u.de == null;
+  $('accBtn').title = u.de == null ? 'No De calculated, so Accept is unavailable' : 'Accept (A) · moves to the next unit';
   document.querySelectorAll('#units tr.pick').forEach(r => r.classList.toggle('sel', +r.dataset.i === sel));
   renderMap(); renderQC(u); drawHist(u); drawRadial(u);
   drawUnitCurve(u, token); drawDR(u, token);
@@ -463,13 +486,13 @@ function drawHist(u) {
   const lo = Math.min(...all), hi = Math.max(...all);
   const NB = 15, size = (hi - lo) / NB || 1, edges = [...Array(NB)].map((_, k) => lo + k * size);
   const count = a => { const c = Array(NB).fill(0); a.forEach(x => c[Math.min(NB - 1, Math.floor((x.de - lo) / size))]++); return c; };
-  const ok = units.filter(x => x.de != null && x.rc_status === 'OK'), no = units.filter(x => x.de != null && x.rc_status !== 'OK');
+  const ok = units.filter((x, i) => x.de != null && run.dec[i]), no = units.filter((x, i) => x.de != null && !run.dec[i]);
   const noDe = units.length - all.length;
   const bar = (a, name, color) => ({ type: 'bar', name, x: edges.map(e => e + size / 2), y: count(a), width: size,
     marker: { color, line: { color: '#fff', width: 1 } }, customdata: edges.map(e => `${e.toFixed(0)}–${(e + size).toFixed(0)}`),
     hovertemplate: '%{customdata} s: %{y}<extra>' + name + '</extra>' });
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
-  plot('dHist', [bar(no, `Fail (${no.length})` + (noDe ? ` · ${noDe} without De excluded` : ''), C.fail), bar(ok, `Pass (${ok.length})`, C.pass)],
+  plot('dHist', [bar(no, `Reject (${no.length})` + (noDe ? ` · ${noDe} without De excluded` : ''), C.fail), bar(ok, `Accept (${ok.length})`, C.pass)],
     { ...BASE, barmode: 'stack', shapes, title: title('De distribution · dashed = selected unit'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }) }, PC);
 }
 
@@ -484,11 +507,11 @@ function drawRadial(u) {
   const lo = Math.min(...des), hi = Math.max(...des);
   const raw = (hi - lo) / 4 || lo / 4, mag = 10 ** Math.floor(Math.log10(raw)), step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(m => m >= raw);
   const ticks = []; for (let v = Math.max(step, Math.floor(lo / step) * step); v <= Math.ceil(hi / step) * step + 1e-9; v += step) ticks.push(v);
-  const selPt = u.rc_status === 'OK' ? P.findIndex(p => Math.abs(p.de - u.de) < 1e-6) : -1;
-  const note = selPt < 0 ? ' · selected unit failed, so not shown' : '';
+  const selPt = run.dec[sel] ? P.findIndex(p => Math.abs(p.de - u.de) < 1e-6) : -1;
+  const note = selPt < 0 ? ' · selected unit is rejected, so not shown' : '';
   const layout = Y => ({ ...BASE, title: title('Radial plot (arc: De scale, s)' + note),
     xaxis: ax({ title: 'Precision (1/relative error)', range: [0, X] }), yaxis: ax({ title: 'Standardized distance', range: [-Y, Y] }) });
-  const pts = { x: P.map(p => p.radial_x), y: P.map(p => p.radial_y), mode: 'markers', name: 'Passing De', marker: { color: C.pass, size: 9 },
+  const pts = { x: P.map(p => p.radial_x), y: P.map(p => p.radial_y), mode: 'markers', name: 'Accepted De', marker: { color: C.pass, size: 9 },
     text: P.map(p => `De ${fmt(p.de)} ± ${fmt(p.de_error)} s`), hovertemplate: '%{text}<extra></extra>' };
   let Y = Math.max(3, ...P.map(p => Math.abs(p.radial_y))) * 1.15;
   plot(gd, [pts], layout(Y));
@@ -521,7 +544,7 @@ function renderMap() {
     const c = el('div', label, 'cell');
     if (k >= 0) {
       const x = units[k];
-      c.classList.add(x.rc_status === 'OK' ? 'pass' : 'fail');
+      c.classList.add(run.dec[k] ? 'pass' : 'fail');
       c.title = `${unitLabel(x)} · De ${fmt(x.de)} s`; c.onclick = () => select(k);
       if (k === sel) c.classList.add('cur');
     }
@@ -556,29 +579,40 @@ function renderQC(u) {
 function renderTable() {
   const t = $('units'), only = $('onlyPass').checked; t.replaceChildren();
   const sgMode = run.mode === 'single_grain';
-  const h = el('tr'); [...(sgMode ? ['Disc', 'Grain'] : ['Disc']), 'De (s)', 'Verdict', 'Recycling', 'Fit', 'Warning'].forEach(x => h.append(el('th', x))); t.append(h);
+  const h = el('tr'); [...(sgMode ? ['Disc', 'Grain'] : ['Disc']), 'De (s)', 'Automatic', 'Final', 'Recycling', 'Fit', 'Warning'].forEach(x => h.append(el('th', x))); t.append(h);
   let n = 0;
   U().forEach((u, i) => {
-    const pass = u.rc_status === 'OK'; if (only && !pass) return; n++;
+    const ok = run.dec[i]; if (only && !ok) return; n++;
     const r = el('tr', null, 'pick'); r.dataset.i = i;
     (sgMode ? [u.position, u.grain] : [u.position]).forEach(x => r.append(el('td', x, 'num')));
     const w = el('td', u.warning ? 'yes' : ''); if (u.warning) w.title = u.warning;
-    r.append(el('td', `${fmt(u.de)} ± ${fmt(u.de_error)}`, 'num'), el('td', pass ? '● Pass' : '✕ Fail', pass ? 'ok' : 'no'),
+    const [txt, cls] = DEC(ok);
+    r.append(el('td', `${fmt(u.de)} ± ${fmt(u.de_error)}`, 'num'), el('td', AUTO(u) ? 'Accept' : 'Reject'),
+             el('td', txt + (ok === AUTO(u) ? '' : ' (manual)'), cls),
              el('td', fmt(u.recycling_ratio, 3), 'num'), el('td', u.fit ?? ''), w);
     if (i === sel) r.classList.add('sel');
     r.onclick = () => select(i); t.append(r);
   });
   $('tableCount').textContent = `${n} shown / ${U().length} total`;
 }
+// As in Analyst, a verdict moves to the next unit. A unit without De cannot be accepted (no value to feed the model).
+function decide(ok) {
+  if (ok && U()[sel].de == null) return;
+  if (run.dec[sel] !== ok) { run.dec[sel] = ok; renderTable(); refreshAge(); }
+  select(sel + 1);
+}
+$('accBtn').onclick = () => decide(true);
+$('rejBtn').onclick = () => decide(false);
 $('onlyPass').onchange = renderTable;
 $('prevBtn').onclick = () => select(sel - 1);
 $('nextBtn').onclick = () => select(sel + 1);
 document.addEventListener('keydown', e => {
-  if (!run || tab !== 'dash' || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+  if (!run || tab !== 'calc' || e.metaKey || e.ctrlKey || e.altKey || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
   if (e.key === 'ArrowLeft') select(sel - 1); else if (e.key === 'ArrowRight') select(sel + 1);
+  else if (e.key === 'a' || e.key === 'A') decide(true); else if (e.key === 'r' || e.key === 'R') decide(false);
 });
 
-// ---- 04 Model
+// ---- 03 Model
 function renderModel() {
   const A = run.age, box = $('modelBox'); box.replaceChildren();
   if (!A.ok) { box.append(el('p', 'Cannot compute: ' + A.error)); return; }
@@ -593,7 +627,8 @@ function renderModel() {
   } else {
     box.append(el('p', `Representative dose: ${fmt(R.dose)} ± ${fmt(R.dose_error)} s`, 'big'));
   }
-  box.append(el('p', `De used: ${R.n} · overdispersion ${fmt(A.distribution.od_rel)}% · sigmab ${R.sigmab == null ? 'not used' : R.sigmab}. Minimum-count threshold awaits the researchers.`, 'note'),
+  const changed = U().filter((u, i) => run.dec[i] !== AUTO(u)).length;
+  box.append(el('p', `De used: ${R.n} (Accept) · changed by hand: ${changed} · overdispersion ${fmt(A.distribution.od_rel)}% · sigmab ${R.sigmab == null ? 'not used' : R.sigmab}. Minimum-count threshold awaits the researchers.`, 'note'),
              el('p', `${R.package} ${R.package_version} · R ${run.meta.r_version}`, 'note'));
 }
 
@@ -603,9 +638,8 @@ renderContext();
 renderFile();
 fillGrains();
 go(location.hash.slice(1));
-document.fonts.ready.then(() => { syncSeg(); go(location.hash.slice(1)); });   // the font swap changes tab and button widths, so realign
+document.fonts.ready.then(() => go(location.hash.slice(1)));   // the font swap changes tab and button widths, so realign
 let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
-  syncSeg();
   document.querySelectorAll('.plot').forEach(gd => { if (gd.data) Plotly.relayout(gd, legendLayout(gd)); });   // recompute the legend position when the chart height changes
-  if (run && tab === 'dash') drawRadial(U()[sel]);
+  if (run && tab === 'calc') drawRadial(U()[sel]);
 }, 150); });

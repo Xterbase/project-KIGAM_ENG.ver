@@ -218,9 +218,11 @@ stopifnot(
   "curve data" = length(r$result$curve_x) == 100
 )
 
-r <- call_run("age_model", list(de = ca1[[1]], de_error = ca1[[2]], sigmab = 0.15))
+sel <- list(list(position = 1, grain = NA, auto = "reject", final = "accept"))
+r <- call_run("age_model", list(de = ca1[[1]], de_error = ca1[[2]], sigmab = 0.15, selection = sel))
 stopifnot(
   "age_model succeeds" = r$ok,
+  "verdict record kept in the result" = r$result$selection[[1]]$final == "accept" && is.null(r$result$selection[[1]]$grain),
   "FMM component table" = length(r$result$result$components) == 3,
   "FMM dose is null" = is.null(r$result$result$dose),
   "radial coordinates" = length(r$result$distribution$points) == 62,

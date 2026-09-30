@@ -44,11 +44,9 @@ if ($meta === null || $inspect === null) {
       <li class="pill" id="pill" aria-hidden="true"></li>
       <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
         <div class="sub"><ul><li><a href="#file">Choose file</a></li><li><a href="#uplist">Recent uploads</a></li></ul></div></li>
-      <li data-v="signal"><a class="tab" href="#signal"><span class="dot"></span>Signal analysis<span class="num">02</span></a>
-        <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings · SAR</a></li></ul></div></li>
-      <li data-v="dash"><a class="tab" href="#dash"><span class="dot"></span>Dashboard<span class="num">03</span></a>
-        <div class="sub"><ul><li><a href="#dplots">Four charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
-      <li data-v="model"><a class="tab" href="#model"><span class="dot"></span>Age model<span class="num">04</span></a>
+      <li data-v="calc"><a class="tab" href="#calc"><span class="dot"></span>De calculation &amp; distribution<span class="num">02</span></a>
+        <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings</a></li><li><a href="#dplots">Four charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
+      <li data-v="model"><a class="tab" href="#model"><span class="dot"></span>Age model<span class="num">03</span></a>
         <div class="sub"><ul><li><a href="#modelBox">Recommendation · representative dose</a></li></ul></div></li>
     </ul>
   </nav>
@@ -76,8 +74,9 @@ if ($meta === null || $inspect === null) {
       <?php sample_table(list_samples(), $id); ?>
     </section>
 
-    <section class="view" id="signal">
-      <p class="axis">02 · Signal analysis</p>
+    <!-- Before De calculation only the curves and analysis settings show; after it the distribution results (distBody) appear below. -->
+    <section class="view" id="calc">
+      <p class="axis">02 · De calculation &amp; distribution</p>
       <h2>Signal curves and analysis settings</h2>
       <div class="row" id="sigcurve">
         <label>Disc <select id="selPos"></select></label>
@@ -92,31 +91,30 @@ if ($meta === null || $inspect === null) {
       <div class="card">
         <form id="runForm">
           <div class="row">
-            <span class="seg" id="modeSeg"><span class="thumb"></span></span>
+            <label>Measurement mode <b id="modeVal"></b></label>
             <!-- Integral = start channel : end channel. The ':' is fixed; only the two numbers are typed. -->
             <label>Signal integral <span class="range"><input type="number" id="sig1" min="1" placeholder="6" required><i>:</i><input type="number" id="sig2" min="1" placeholder="10" required></span></label>
             <label>Background integral <span class="range"><input type="number" id="bg1" min="1" placeholder="81" required><i>:</i><input type="number" id="bg2" min="1" placeholder="100" required></span></label>
           </div>
           <div class="row" style="margin:0">
-            <button type="submit" class="btn primary" id="runBtn">Run SAR</button>
+            <button type="submit" class="btn primary" id="runBtn">Calculate De</button>
             <span class="note" id="runStatus"></span>
           </div>
         </form>
         <p class="note" id="runHint" style="margin:10px 0 0"></p>
       </div>
-    </section>
 
-    <section class="view" id="dash">
-      <p class="axis">03 · Dashboard</p>
-      <h2>De distribution dashboard</h2>
-      <p class="note" id="distEmpty">Waiting for SAR. Set the integrals in 02 · Signal analysis and run it to show this.</p>
       <div id="distBody" hidden>
+        <h2 id="dresult">De distribution</h2>
+        <p class="note no" id="staleNote" hidden></p>
         <div class="selbar">
           <button class="btn" id="prevBtn" title="Previous (←)">Previous</button>
           <span class="big" id="selTitle"></span>
           <span id="selDetail"></span>
           <button class="btn" id="nextBtn" title="Next (→)">Next</button>
-          <span class="note">Click the table or map, or use the ← → keys</span>
+          <button class="btn" id="accBtn" title="Accept (A) · moves to the next unit">Accept</button>
+          <button class="btn" id="rejBtn" title="Reject (R) · moves to the next unit">Reject</button>
+          <span class="note">Click the table or map, or use the ← → keys · A / R keys to Accept / Reject (moves to the next)</span>
         </div>
         <div class="howto"></div>
         <div class="dash" id="dplots">
@@ -125,18 +123,18 @@ if ($meta === null || $inspect === null) {
           <div class="plotbox"><div id="dHist" class="plot"></div></div>
           <div class="plotbox"><div id="dRadial" class="plot"></div></div>
         </div>
-        <p class="note">Radial plot: only QC-passing De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>
+        <p class="note">Radial plot: only accepted De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>
         <div class="lower">
           <div id="dmap">
             <div class="row"><b id="mapTitle"></b> <select id="mapDisc"></select></div>
             <div class="map" id="map"></div>
-            <div class="legend"><span><i style="background:var(--pass)"></i>Pass</span><span><i style="background:var(--fail)"></i>Fail</span>
+            <div class="legend"><span><i style="background:var(--pass)"></i>Accept</span><span><i style="background:var(--fail)"></i>Reject</span>
               <span><i style="box-shadow:inset 0 0 0 0.5px var(--slate-smoke)"></i>Not in file</span></div>
             <p class="note" id="mapNote"></p>
           </div>
           <div>
             <div class="row" id="dtable"><b>Results per analysis unit</b>
-              <label class="switch"><input type="checkbox" id="onlyPass"><span class="track"><span class="knob"></span></span>Passing only</label>
+              <label class="switch"><input type="checkbox" id="onlyPass"><span class="track"><span class="knob"></span></span>Accepted only</label>
               <span class="note" id="tableCount"></span></div>
             <div class="tablewrap"><table id="units"></table></div>
             <p class="note" id="failedNote"></p>
@@ -148,9 +146,9 @@ if ($meta === null || $inspect === null) {
     </section>
 
     <section class="view" id="model">
-      <p class="axis">04 · Age model</p>
+      <p class="axis">03 · Age model</p>
       <h2>Age model</h2>
-      <div class="card" id="modelBox"><p class="note">Waiting for SAR.</p></div>
+      <div class="card" id="modelBox"><p class="note">Waiting for De calculation.</p></div>
     </section>
   </main>
 </div>
