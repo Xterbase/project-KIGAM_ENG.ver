@@ -84,7 +84,7 @@ $samples = list_samples();
     </label>
   </form>
 
-  <p class="axis" style="margin-top:48px">Recent uploads</p>
+  <p class="axis" style="margin-top:48px">Recent uploads (latest 10 files)</p>
   <?php if (!$samples): ?>
     <p class="note">No files uploaded yet.</p>
   <?php else: ?>

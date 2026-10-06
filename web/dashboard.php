@@ -43,7 +43,7 @@ if ($meta === null || $inspect === null) {
     <ul class="tree" id="tree">
       <li class="pill" id="pill" aria-hidden="true"></li>
       <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
-        <div class="sub"><ul><li><a href="#file">Choose file</a></li><li><a href="#uplist">Recent uploads</a></li></ul></div></li>
+        <div class="sub"><ul><li><a href="#file">Uploaded file info</a></li><li><a href="#uplist">Recent uploads</a></li></ul></div></li>
       <li data-v="calc"><a class="tab" href="#calc"><span class="dot"></span>De calculation &amp; distribution<span class="num">02</span></a>
         <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings</a></li><li><a href="#dplots">Five charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
       <li data-v="model"><a class="tab" href="#model"><span class="dot"></span>Age model<span class="num">03</span></a>
@@ -56,21 +56,22 @@ if ($meta === null || $inspect === null) {
 
     <section class="view" id="upload">
       <p class="axis">01 · Upload</p>
-      <h2>Upload a measurement file</h2>
+      <!-- This page shows a file already uploaded, so the drop zone stays hidden until 'Upload another file' is pressed. -->
+      <div class="headrow"><h2>Upload a measurement file</h2><button class="btn" type="button" id="reupBtn">Upload another file</button></div>
       <!-- index.php handles the upload (save → inspect → redirect to the new dashboard). -->
-      <form method="post" action="./" enctype="multipart/form-data" id="upForm">
+      <form method="post" action="./" enctype="multipart/form-data" id="upForm" hidden>
         <label class="drop" id="drop">
           <input type="file" name="bin" accept=".bin,.BIN,.rda,.rdata,.RData" hidden>
           <b>Drop a BIN / RDA file here</b><span class="note">or click to choose · after upload the file layout is read and the new dashboard opens (a few seconds)</span>
         </label>
       </form>
 
-      <h3 id="file">Choose file</h3>
+      <h3 id="file">Uploaded file info</h3>
       <div class="card facts" id="facts"></div>
       <h3>Discs</h3>
       <div class="tablewrap"><table id="discs"></table></div>
 
-      <h3 id="uplist">Recent uploads</h3>
+      <h3 id="uplist">Recent uploads (latest 10 files)</h3>
       <?php sample_table(list_samples(), $id); ?>
     </section>
 
@@ -124,7 +125,7 @@ if ($meta === null || $inspect === null) {
           <div class="plotbox"><div id="dWHist" class="plot"></div></div>
           <div class="plotbox"><div id="dRadial" class="plot"></div></div>
         </div>
-        <p class="note">Radial plot: only accepted De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>
+        <p class="note">Histogram · Weighted histogram: dashed = selected unit. Radial plot: only accepted De shown; the arc scale is De (s). Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>
         <div class="lower">
           <div id="dmap">
             <div class="row"><b id="mapTitle"></b> <select id="mapDisc"></select></div>

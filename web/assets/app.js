@@ -114,11 +114,15 @@ function addTools(gd) {
   }
 }
 // If the title overlaps the tool buttons at the top right horizontally (narrow cell), widen the box top so the title drops below the button row.
+// The five dashboard cells must keep their titles level, so if any one overlaps, all move down.
 // Only horizontal positions are compared, so changing the top padding cannot flip the result.
 function fitTitle(gd) {
-  const ttl = gd.querySelector('.gtitle'), tools = gd.parentElement.querySelector('.ptools');
-  if (!ttl || !tools) return;
-  gd.parentElement.classList.toggle('crowded', ttl.getBoundingClientRect().right > tools.getBoundingClientRect().left - 6);
+  const box = gd.parentElement, dash = box.parentElement.classList.contains('dash') ? box.parentElement : null;
+  const boxes = dash ? [...dash.querySelectorAll(':scope > .plotbox')] : [box];
+  const over = b => { const t = b.querySelector('.gtitle'), tools = b.querySelector('.ptools');
+    return !!t && !!tools && t.getBoundingClientRect().right > tools.getBoundingClientRect().left - 6; };
+  const crowded = boxes.some(over);
+  boxes.forEach(b => b.classList.toggle('crowded', crowded));
 }
 function hideAxes(gd) { if (gd._track) Object.values(gd._track).forEach(({ t, tip }) => { t.classList.remove('show'); tip.classList.remove('show'); }); }
 
@@ -224,9 +228,11 @@ function toggleBig(box) {
     const l = b.getBoundingClientRect(), f = first[i], gd = b.querySelector('.plot');
     b.animate([{ transformOrigin: 'top left', transform: `translate(${f.left - l.left}px, ${f.top - l.top}px) scale(${f.width / l.width}, ${f.height / l.height})` },
                { transformOrigin: 'top left', transform: 'none' }], { duration: 480, easing: 'cubic-bezier(.34, 1.2, .64, 1)' });
-    gd.animate([{ opacity: .35 }, { opacity: 1 }], { duration: 480, easing: 'ease-out' }).finished.then(() => syncAxes(gd));   // positions measured mid-animation are wrong, so re-measure when it ends
+    gd.animate([{ opacity: .35 }, { opacity: 1 }], { duration: 480, easing: 'ease-out' }).finished.then(() => {
+      syncAxes(gd);   // positions measured mid-animation are wrong, so measure again once it ends
+      if (on && b === box) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });   // scroll down a little so the expanded chart below is in view
+    });
   });
-  if (on) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const b = document.querySelector('.plotbox.big'); if (b) toggleBig(b); } });
 
@@ -286,10 +292,11 @@ function renderContext() {
 
 // ---- 01 File
 function renderFile() {
-  const facts = [[B.file, 'File'], [SG ? 'single-grain' : 'single-aliquot', 'Measurement mode'], [I.n_positions, 'Discs'],
-    [SG ? I.grains.length : '—', 'Grains'], [I.records.length, 'Records'], [arr(I.record_types).join(', '), 'Record types'], [NCH, 'Channels (OSL)']];
-  if (I.object_name) facts.push([I.object_name, 'RDA object']);
+  // 2 rows × 4 columns: row 1 is the file itself, row 2 its layout
+  const facts = [[B.file, 'File'], [SG ? 'single-grain' : 'single-aliquot', 'Measurement mode'], [NCH, 'Channels (OSL)'], [I.object_name || '—', 'RDA object'],
+    [I.n_positions, 'Discs'], [SG ? I.grains.length : '—', 'Grains'], [I.records.length, 'Records'], [arr(I.record_types).join(', '), 'Record types']];
   facts.forEach(([v, k]) => { const d = el('div'); d.append(el('span', k), el('b', v)); $('facts').append(d); });
+  $('reupBtn').onclick = () => { $('upForm').hidden = false; $('reupBtn').hidden = true; };   // show the drop zone again in its initial state
   if (arr(I.ignored_objects).length) $('facts').append(el('p', `Other objects in the RDA (${arr(I.ignored_objects).join(', ')}) are not used.`, 'note'));
 
   const t = $('discs'), h = el('tr'); ['Disc', 'Grains', 'Grain numbers'].forEach(x => h.append(el('th', x))); t.append(h);
@@ -336,7 +343,7 @@ async function showSignal() {
   try {
     const c = (await cached('curve', { position: p, record_index: i, ...(SG ? { grain: g } : {}) })).result;
     if (token !== sigToken) return;
-    sigCurve = { c, text: `Disc ${p}` + (SG ? ` · grain ${g}` : '') + ` · #${i} ${rec.ltype}` };
+    sigCurve = { c, text: `Disc ${p}` + (SG ? ` · Grain ${g}` : '') + ` · #${i} ${rec.ltype}` };
     drawSignal();
     $('curveInfo').textContent = `Measurement temperature ${rec.temperature}°C · regeneration dose ${rec.irr_time} s · ${c.x.length} channels. Hover over the curve to see channel numbers.`;
   } catch (e) { if (token === sigToken) plotMessage('curvePlot', 'Could not load the curve: ' + e.message); }
@@ -440,7 +447,6 @@ function select(i) {
       + ` · Recycling ${fmt(u.recycling_ratio, 3)}` + (u.warning ? ' · has warning' : '')));
   $('prevBtn').disabled = sel === 0;
   $('nextBtn').disabled = sel === units.length - 1;
-  $('accBtn').classList.toggle('primary', ok); $('rejBtn').classList.toggle('primary', !ok);
   $('accBtn').disabled = u.de == null;
   $('accBtn').title = u.de == null ? 'No De calculated, so Accept is unavailable' : 'Accept (A) · moves to the next unit';
   document.querySelectorAll('#units tr.pick').forEach(r => r.classList.toggle('sel', +r.dataset.i === sel));
@@ -455,7 +461,7 @@ async function drawUnitCurve(u, token) {
   try {
     const c = (await cached('curve', args)).result;
     if (token !== selToken) return;
-    drawCurve('dCurve', c, 'Signal curve · ' + (!sgMode && SG ? 'disc sum · ' : '') + 'natural signal', parseRange(run.sig), parseRange(run.bg));
+    drawCurve('dCurve', c, 'Natural decay curve' + (!sgMode && SG ? ' · disc sum' : ''), parseRange(run.sig), parseRange(run.bg));
   } catch (e) { if (token === selToken) plotMessage('dCurve', 'Could not load the curve: ' + e.message); }
 }
 
@@ -482,7 +488,7 @@ async function drawDR(u, token) {
     shapes.push({ type: 'line', x0: 0, x1: d.de, y0: nat.lxtx, y1: nat.lxtx, line: { color: C.natural, dash: 'dot', width: 1 } },
                 { type: 'line', x0: d.de, x1: d.de, y0: 0, y1: nat.lxtx, line: { color: C.natural, dash: 'dot', width: 1 } });
   }
-  plot('dDR', traces, { ...BASE, shapes, title: title('Dose-response curve' + (d.de == null ? ' · De not computable' : '')),
+  plot('dDR', traces, { ...BASE, shapes, title: title('Dose-response curve' + (d.de == null ? ' · no De' : '')),
     xaxis: ax({ title: 'Regeneration dose (s)', rangemode: 'tozero' }), yaxis: ax({ title: 'Lx/Tx', rangemode: 'tozero' }) }, PC);
 }
 
@@ -500,7 +506,7 @@ function drawHist(u) {
     hovertemplate: '%{customdata} s: %{y}<extra>' + name + '</extra>' });
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
   plot('dHist', [bar(no, `Reject (${no.length})` + (noDe ? ` · ${noDe} without De excluded` : ''), C.fail), bar(ok, `Accept (${ok.length})`, C.pass)],
-    { ...BASE, barmode: 'stack', shapes, title: title('De distribution · dashed = selected unit'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }) }, PC);
+    { ...BASE, barmode: 'stack', shapes, title: title('Histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }) }, PC);
 }
 
 // Weighted histogram (Analyst's Weighted histogram): one unit-area Gaussian per accepted De (width = its De error), summed.
@@ -515,7 +521,7 @@ function drawWHist(u) {
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
   plot('dWHist', [{ x, y, mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(0,158,115,0.15)', line: { color: C.pass, width: 1.5 },
     name: `Accept (${P.length})`, hovertemplate: '%{x:.0f} s: %{y:.3g}<extra></extra>' }],
-    { ...BASE, shapes, title: title('Weighted histogram · dashed = selected unit'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Density (1/s)', rangemode: 'tozero' }) });
+    { ...BASE, shapes, title: title('Weighted histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Density (1/s)', rangemode: 'tozero' }) });
 }
 
 // Radial plot. Each line from the origin is one De value (slope = log De − log central value).
@@ -530,8 +536,7 @@ function drawRadial(u) {
   const raw = (hi - lo) / 4 || lo / 4, mag = 10 ** Math.floor(Math.log10(raw)), step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(m => m >= raw);
   const ticks = []; for (let v = Math.max(step, Math.floor(lo / step) * step); v <= Math.ceil(hi / step) * step + 1e-9; v += step) ticks.push(v);
   const selPt = run.dec[sel] ? P.findIndex(p => Math.abs(p.de - u.de) < 1e-6) : -1;
-  const note = selPt < 0 ? ' · selected unit is rejected, so not shown' : '';
-  const layout = Y => ({ ...BASE, title: title('Radial plot (arc: De scale, s)' + note),
+  const layout = Y => ({ ...BASE, title: title('Radial plot'),
     xaxis: ax({ title: 'Precision (1/relative error)', range: [0, X] }), yaxis: ax({ title: 'Standardized distance', range: [-Y, Y] }) });
   const pts = { x: P.map(p => p.radial_x), y: P.map(p => p.radial_y), mode: 'markers', name: 'Accepted De', marker: { color: C.pass, size: 9 },
     text: P.map(p => `De ${fmt(p.de)} ± ${fmt(p.de_error)} s`), hovertemplate: '%{text}<extra></extra>' };
@@ -620,6 +625,8 @@ function renderTable() {
 // As in Analyst, a verdict moves to the next unit. A unit without De cannot be accepted (no value to feed the model).
 function decide(ok) {
   if (ok && U()[sel].de == null) return;
+  const b = $(ok ? 'accBtn' : 'rejBtn');   // a brief black border on the pressed button, also when pressed with the keyboard (A/R)
+  b.classList.remove('hit'); void b.offsetWidth; b.classList.add('hit');
   if (run.dec[sel] !== ok) { run.dec[sel] = ok; renderTable(); refreshAge(); }
   select(sel + 1);
 }

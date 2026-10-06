@@ -13,6 +13,7 @@ define('SAMPLES', ROOT . '/outputs/samples');
 define('RSCRIPT', getenv('RSCRIPT') ?: 'Rscript');
 
 const ALLOWED_EXT = ['bin', 'rda', 'rdata'];
+const LIST_SAMPLES = 10;   // how many samples the recent-uploads list shows
 
 // Sample ids and upload times are in Korean time. Some servers set UTC in php.ini, so it is fixed here.
 date_default_timezone_set('Asia/Seoul');
@@ -39,7 +40,7 @@ function read_json(string $path): ?array
     return is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
 }
 
-// Sample list (newest first). Folder names start with the time, so reverse name order = newest first. Shared by index.php and dashboard.php.
+// Sample list (newest LIST_SAMPLES). Folder names start with the time, so reverse name order = newest first. Shared by index.php and dashboard.php.
 function list_samples(): array
 {
     $samples = [];
@@ -50,7 +51,7 @@ function list_samples(): array
             $samples[] = ['id' => $id] + $meta;
         }
     }
-    return $samples;
+    return array_slice($samples, 0, LIST_SAMPLES);
 }
 
 // Measurement-mode cell of the list table
