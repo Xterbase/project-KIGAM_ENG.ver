@@ -45,7 +45,7 @@ if ($meta === null || $inspect === null) {
       <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
         <div class="sub"><ul><li><a href="#file">Choose file</a></li><li><a href="#uplist">Recent uploads</a></li></ul></div></li>
       <li data-v="calc"><a class="tab" href="#calc"><span class="dot"></span>De calculation &amp; distribution<span class="num">02</span></a>
-        <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings</a></li><li><a href="#dplots">Four charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
+        <div class="sub"><ul><li><a href="#sigcurve">Curves</a></li><li><a href="#sigrun">Analysis settings</a></li><li><a href="#dplots">Five charts</a></li><li><a href="#dmap">Disc map</a></li><li><a href="#dtable">Results per unit</a></li><li><a href="#dqc">QC of selected unit</a></li></ul></div></li>
       <li data-v="model"><a class="tab" href="#model"><span class="dot"></span>Age model<span class="num">03</span></a>
         <div class="sub"><ul><li><a href="#modelBox">Recommendation · representative dose</a></li></ul></div></li>
     </ul>
@@ -121,6 +121,7 @@ if ($meta === null || $inspect === null) {
           <div class="plotbox"><div id="dCurve" class="plot"></div></div>
           <div class="plotbox"><div id="dDR" class="plot"></div></div>
           <div class="plotbox"><div id="dHist" class="plot"></div></div>
+          <div class="plotbox"><div id="dWHist" class="plot"></div></div>
           <div class="plotbox"><div id="dRadial" class="plot"></div></div>
         </div>
         <p class="note">Radial plot: only accepted De shown. Read a De by extending the line from the origin (left 0) through the point to the arc on the right. Inside the grey band (±2) a point equals the central value within its own error.</p>

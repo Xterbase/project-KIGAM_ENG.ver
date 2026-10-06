@@ -66,11 +66,9 @@ const ICON = {
   shr: '<svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',    // ↙↗ restore size
 };
 const gdOf = d => typeof d === 'string' ? $(d) : d;
-const isSide = gd => !!gd.closest('.dash.expanded') && !gd.closest('.big');   // a small cell on the right while one chart is expanded
 // The legend goes below the x-axis title (78px from the axis). Plotly positions legends as a fraction of the plot height, so it is recomputed per height.
-// In the small cells on the right the legend would overlap the axis title, so it is hidden.
 function legendLayout(gd) {
-  const on = gd._legend && !isSide(gd), b = on ? 124 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
+  const on = gd._legend, b = on ? 124 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
   return { showlegend: on, 'margin.b': b, 'legend.y': -78 / h, 'legend.yanchor': 'top' };
 }
 function plot(div, data, layout) {
@@ -84,21 +82,28 @@ function plot(div, data, layout) {
   if (!gd._events) {
     gd._events = true;
     gd.on('plotly_relayout', () => syncAxes(gd));
+    // Double-click on the expanded chart: if it is zoomed, only the zoom is reset (Plotly default); otherwise back to one row of five.
+    gd.on('plotly_doubleclick', () => { if (gd.parentElement.classList.contains('big') && !gd._wasZoomed) toggleBig(gd.parentElement); });
     gd.on('plotly_afterplot', () => { fitTitle(gd); syncAxes(gd); });   // re-measure tick and axis-title positions after a resize too
   }
   fitTitle(gd); syncAxes(gd);
   return p;
 }
 const rangeOf = (gd, a) => [...gd._fullLayout[a + 'axis'].range];
-const isZoomed = (gd, a) => { const h = gd._home[a], c = rangeOf(gd, a), e = (h[1] - h[0]) * 1e-3; return c[0] > h[0] + e || c[1] < h[1] - e; };
+const isZoomed = (gd, a) => { if (gd._fullLayout[a + 'axis'].autorange) return false;   // autorange = not zoomed
+  const h = gd._home[a], c = rangeOf(gd, a), e = (h[1] - h[0]) * 1e-3; return c[0] > h[0] + e || c[1] < h[1] - e; };
 
-// Adds the tool buttons (magnifier −/+, plus expand on the four dashboard cells) and the two axis zoom guides to a chart box, once.
+// Adds the tool buttons (magnifier −/+, plus expand on the five dashboard cells) and the two axis zoom guides to a chart box, once.
 function addTools(gd) {
   const box = gd.parentElement, tools = el('div', null, 'ptools');
   const btn = (k, tip, fn) => { const b = el('button', null, k); b.type = 'button'; b.innerHTML = ICON[k]; b.title = tip; b.onclick = fn; tools.append(b); return b; };
   btn('zout', 'Zoom out', () => zoomBy(gd, 1.6));
   btn('zin', 'Zoom in (around the centre)', () => zoomBy(gd, 1 / 1.6));
-  if (box.parentElement.classList.contains('dash')) btn('exp', 'Expand', () => toggleBig(box));
+  if (box.parentElement.classList.contains('dash')) {
+    btn('exp', 'Expand', () => toggleBig(box));
+    // Remember whether the chart was zoomed just before a double-click (by the double-click event Plotly has already reset the range). Used by plotly_doubleclick in plot().
+    box.addEventListener('mousedown', () => { gd._wasZoomed = !!gd._home && (isZoomed(gd, 'x') || isZoomed(gd, 'y')); }, true);
+  }
   box.append(tools);
   gd._track = {};
   for (const a of ['x', 'y']) {
@@ -125,6 +130,8 @@ function syncAxes(gd) {
   const s = gd._fullLayout._size, ox = gd.offsetLeft, oy = gd.offsetTop, B = gd.parentElement.getBoundingClientRect();
   const rects = q => [...gd.querySelectorAll(q)].map(e => e.getBoundingClientRect()).filter(r => r.width);
   for (const a of ['x', 'y']) {
+    // Autorange pads by the marker size in pixels, so it changes when the cell is resized. Before any zoom (autorange) the current range is the full range.
+    if (gd._fullLayout[a + 'axis'].autorange) gd._home[a] = rangeOf(gd, a);
     const { t, th, tip } = gd._track[a], z = isZoomed(gd, a), was = t.classList.contains('show');
     t.classList.toggle('show', z);
     if (!z) { tip.classList.remove('show'); continue; }
@@ -200,7 +207,7 @@ function zoomBy(gd, f) {
   tween(gd, to);
 }
 
-// Expand: one chart in the big left cell (three rows high), the other three in one column on the right. The rearrangement is animated with FLIP.
+// Expand: the other four in one row of four on top, the chosen chart full width below them. The rearrangement is animated with FLIP.
 function toggleBig(box) {
   const dash = box.parentElement, boxes = [...dash.querySelectorAll(':scope > .plotbox')];
   const first = boxes.map(b => b.getBoundingClientRect()), on = !box.classList.contains('big');
@@ -210,7 +217,7 @@ function toggleBig(box) {
     const e = b.querySelector('.ptools .exp'), big = b.classList.contains('big');
     if (e) { e.innerHTML = ICON[big ? 'shr' : 'exp']; e.title = big ? 'Restore size' : 'Expand'; }
     const gd = b.querySelector('.plot');
-    if (gd.data) { Plotly.relayout(gd, legendLayout(gd)); Plotly.Plots.resize(gd); }
+    if (gd.data) Plotly.Plots.resize(gd).then(() => Plotly.relayout(gd, legendLayout(gd)));   // place the legend only after drawing at the new height
   });
   if (run) drawRadial(U()[sel]);   // radial arcs are recomputed for the area size
   boxes.forEach((b, i) => {
@@ -229,7 +236,7 @@ document.querySelectorAll('.howto').forEach(h => h.innerHTML =
   '<span>While zoomed, drag the <span class="dotdemo"></span> dot between the axis title and the ticks to move</span>' +
   '<span><b>Double-click</b> reset</span>' +
   `<span>${ICON.zout}${ICON.zin} zoom out / in around the centre</span>` +
-  (h.nextElementSibling.classList.contains('dash') ? `<span>${ICON.exp} expand (the rest move to one column on the right · Esc to go back)</span>` : ''));
+  (h.nextElementSibling.classList.contains('dash') ? `<span>${ICON.exp} expand (the chosen chart opens large below · double-click or Esc to go back)</span>` : ''));
 
 // ---- Things available directly from the file layout
 const byDisc = {};
@@ -401,7 +408,7 @@ $('runForm').onsubmit = async e => {
   } finally { clearInterval(tick); $('runBtn').disabled = false; }
 };
 
-// ---- De distribution: choosing one unit updates the four charts, the map and the table together
+// ---- De distribution: choosing one unit updates the five charts, the map and the table together
 const U = () => run.sar.units;
 const unitLabel = u => run.mode === 'single_grain' ? `Disc ${u.position} · grain ${u.grain}` : `Disc ${u.position}`;
 const DEC = ok => ok ? ['● Accept', 'ok'] : ['✕ Reject', 'no'];
@@ -437,7 +444,7 @@ function select(i) {
   $('accBtn').disabled = u.de == null;
   $('accBtn').title = u.de == null ? 'No De calculated, so Accept is unavailable' : 'Accept (A) · moves to the next unit';
   document.querySelectorAll('#units tr.pick').forEach(r => r.classList.toggle('sel', +r.dataset.i === sel));
-  renderMap(); renderQC(u); drawHist(u); drawRadial(u);
+  renderMap(); renderQC(u); drawHist(u); drawWHist(u); drawRadial(u);
   drawUnitCurve(u, token); drawDR(u, token);
 }
 
@@ -494,6 +501,21 @@ function drawHist(u) {
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
   plot('dHist', [bar(no, `Reject (${no.length})` + (noDe ? ` · ${noDe} without De excluded` : ''), C.fail), bar(ok, `Accept (${ok.length})`, C.pass)],
     { ...BASE, barmode: 'stack', shapes, title: title('De distribution · dashed = selected unit'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }) }, PC);
+}
+
+// Weighted histogram (Analyst's Weighted histogram): one unit-area Gaussian per accepted De (width = its De error), summed.
+// Precise values show as narrow and tall, uncertain ones as low and wide. Total area = number of accepted De.
+function drawWHist(u) {
+  const P = U().filter((x, i) => run.dec[i] && x.de != null && x.de_error > 0);
+  if (!P.length) { plotMessage('dWHist', 'No accepted De'); return; }
+  if (!$('dWHist').data) $('dWHist').replaceChildren();
+  const lo = Math.min(...P.map(p => p.de - 3 * p.de_error)), hi = Math.max(...P.map(p => p.de + 3 * p.de_error));
+  const x = [...Array(301)].map((_, k) => lo + (hi - lo) * k / 300);
+  const y = x.map(v => P.reduce((t, p) => t + Math.exp(-0.5 * ((v - p.de) / p.de_error) ** 2) / (p.de_error * Math.sqrt(2 * Math.PI)), 0));
+  const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
+  plot('dWHist', [{ x, y, mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(0,158,115,0.15)', line: { color: C.pass, width: 1.5 },
+    name: `Accept (${P.length})`, hovertemplate: '%{x:.0f} s: %{y:.3g}<extra></extra>' }],
+    { ...BASE, shapes, title: title('Weighted histogram · dashed = selected unit'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Density (1/s)', rangemode: 'tozero' }) });
 }
 
 // Radial plot. Each line from the origin is one De value (slope = log De − log central value).
