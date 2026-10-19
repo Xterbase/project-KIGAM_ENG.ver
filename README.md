@@ -5,11 +5,16 @@
 A workflow assistant for luminescence (OSL/TL) dating.
 
 It brings the analysis from raw measurement data to age calculation together in one place,
-visualizes it, and helps choose a statistical age model (CAM / MAM / FMM, etc.) based on the
-characteristics of the equivalent dose (De) distribution (overdispersion, skewness,
-multimodality). The statistics are handled by the R
+visualizes it, and recommends a statistical age model (CAM / MAM / FMM, etc.) suited to the
+geological sample, based on the characteristics of the equivalent dose (De) distribution
+(overdispersion, skewness, multimodality). Rules pick the model, and an LLM (via API) is planned
+to explain that choice using a literature-based RAG. The aim goes on to calculating the age with
+the recommended model, visualizing the result, and helping researchers write their reports.
+
+The statistics are handled by the R
 [`Luminescence`](https://cran.r-project.org/package=Luminescence) package; this project does not
-reimplement them.
+reimplement them. Currently the rule-based recommendation works, while the LLM/RAG integration
+and the report feature are only outlined under "Future plans" below.
 
 ## Current stage
 
@@ -35,6 +40,18 @@ raw data → signal analysis → De distribution analysis → model recommendati
 | Analysis layer entry | `R/Analysis.R` | Loads the stage files above in order |
 | ver.1.0 UI | `version1_streamlit/` | Works, but is no longer extended |
 | Web UI (PHP) | `web/`, `php/bridge.php` | Upload → signal curve → SAR → De distribution dashboard → model (prototype) |
+
+## Future plans (not implemented)
+
+Only the direction of the LLM and RAG work is set; nothing is implemented yet.
+
+- **Literature corpus (RAG).** Luminescence literature is turned into text by OCR and built into a
+  searchable corpus. Explanations are given together with citations found in this corpus.
+- **The LLM's role is explanation.** The LLM explains the model the rules picked, with literature
+  citations. It does not change the model selection itself (design principle 1 below). Whether it
+  should offer a second opinion near a rule's boundary is under consideration.
+- **The interaction form is undecided.** Whether it is free-form questions (chat) or a fixed-format
+  explanation has not been decided.
 
 ## Design principles
 
