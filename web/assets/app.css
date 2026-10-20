@@ -30,6 +30,7 @@
   --deep-fern: #007010;    /* links */
   --emerald: #008023;      /* data points */
   --indigo-accent: #433787; /* once per page: natural signal → De marker */
+  --blue: #007aff;         /* active tab marker (iOS system blue) */
 
   /* Verdict colours stay outside the style reference (Okabe-Ito, so pass/fail stay distinct with colour-vision deficiency). */
   --pass: #009e73;
@@ -57,10 +58,14 @@ body {
   letter-spacing: 0.012em;
   font-feature-settings: "liga" 0;
   color: var(--forest-ink);
-  background-color: var(--sage-paper);
-  /* A faint dot grid over the whole canvas (graph-paper feel). */
-  background-image: radial-gradient(var(--lichen) 0.8px, transparent 0.8px);
-  background-size: 16px 16px;
+  background-color: #d6c8b1;
+}
+/* Canvas: contour paper (topo.svg) blurred like the iOS Control Center. Apple does not publish Liquid Glass blur
+   values (HIG Materials: "blurs and adjusts the luminosity"), so these are approximations. Negative inset hides the blurred edge. */
+body::before {
+  content: ""; position: fixed; inset: -80px; z-index: -1; pointer-events: none;
+  background: linear-gradient(rgba(255,255,255,.22), rgba(255,255,255,.22)), url("topo.svg") center / cover;
+  filter: blur(30px) saturate(180%);
 }
 
 h1, h2, h3 { font-weight: 500; margin: 0; letter-spacing: 0; }
@@ -200,9 +205,13 @@ nav .file { font-size: 12px; color: var(--slate-smoke); padding-left: 6px; margi
   display: grid; place-items: center; font-size: 11px; flex: none; transition: background .3s, box-shadow .3s, transform .4s var(--spring); }
 .tab .num { font-size: 12px; color: var(--slate-smoke); margin-left: auto; padding-left: 18px; font-variant-numeric: tabular-nums; font-weight: 400; }
 li.on > .tab { color: var(--forest-ink); font-weight: 500; }
-li.on .dot { background: var(--forest-ink); box-shadow: none; transform: scale(1.1); }
 li.done .dot { background: var(--moss); box-shadow: none; }
 li.done .dot::after { content: "✓"; color: var(--bone-white); }
+/* Active tab: blue circle + white right arrow (placed after done ✓ so the arrow wins when both apply) */
+li.on .dot { background: var(--blue); box-shadow: none; transform: scale(1.1); }
+li.on .dot::after { content: ""; width: 11px; height: 11px; background: var(--bone-white);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h7M6 2.5 9.5 6 6 9.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h7M6 2.5 9.5 6 6 9.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
 /* Sub-items (├──): expanded only under the selected tab (height eases from grid 0fr → 1fr) */
 .sub { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--ease); }
 li.on .sub { grid-template-rows: 1fr; }
@@ -218,7 +227,7 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .sub ul li:last-child { padding-bottom: 14px; }
 
 /* Right content panel: the same white paper as the selection box. Cards and tables inside are set apart by a pale surface. */
-.panel { background: var(--bone-white); border-radius: var(--radius-panel); padding: 36px 40px 48px; min-width: 0; }
+.panel { background: var(--bone-white); border-radius: var(--radius-panel); padding: 30px 32px 40px; min-width: 0; }
 .panel .card { background: var(--mist); box-shadow: none; border-radius: 16px; padding: 22px; }
 .panel .tablewrap { box-shadow: inset 0 0 0 1px var(--mist); border-radius: 14px; }
 .panel h2 { font-size: 24px; margin-bottom: 22px; }
