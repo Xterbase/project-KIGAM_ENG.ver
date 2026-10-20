@@ -39,7 +39,7 @@ if ($meta === null || $inspect === null) {
   <nav>
     <div class="brand">Luminous</div>
     <div class="file"><?= h($meta['original_name']) ?></div>
-    <!-- Tree menu: the selected tab becomes a white box (pill) joined to the content panel on the right. Sub-items expand only under the selected tab. -->
+    <!-- Tree menu: the selected tab is wrapped by a white box (pill), a box separate from the content panel. Sub-items expand only under the selected tab. -->
     <ul class="tree" id="tree">
       <li class="pill" id="pill" aria-hidden="true"></li>
       <li data-v="upload"><a class="tab" href="#upload"><span class="dot"></span>Upload<span class="num">01</span></a>
