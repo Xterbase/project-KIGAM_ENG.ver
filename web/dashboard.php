@@ -55,7 +55,7 @@ if ($meta === null || $inspect === null) {
     <div class="context" id="context"></div>
 
     <section class="view" id="upload">
-      <p class="axis">01 · Upload</p>
+      <p class="axis">Upload</p>
       <!-- This page shows a file already uploaded, so the drop zone stays hidden until 'Upload another file' is pressed. -->
       <div class="headrow"><h2>Upload a measurement file</h2><button class="btn" type="button" id="reupBtn">Upload another file</button></div>
       <!-- index.php handles the upload (save → inspect → redirect to the new dashboard). -->
@@ -77,7 +77,7 @@ if ($meta === null || $inspect === null) {
 
     <!-- Before De calculation only the curves and analysis settings show; after it the distribution results (distBody) appear below. -->
     <section class="view" id="calc">
-      <p class="axis">02 · De calculation &amp; distribution</p>
+      <p class="axis">De calculation &amp; distribution</p>
       <h2>Signal curves and analysis settings</h2>
       <div class="row" id="sigcurve">
         <label>Disc <select id="selPos"></select></label>
@@ -148,7 +148,7 @@ if ($meta === null || $inspect === null) {
     </section>
 
     <section class="view" id="model">
-      <p class="axis">03 · Age model</p>
+      <p class="axis">Age model</p>
       <h2>Age model</h2>
       <div class="card" id="modelBox"><p class="note">Waiting for De calculation.</p></div>
     </section>

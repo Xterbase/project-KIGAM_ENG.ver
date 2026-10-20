@@ -18,7 +18,7 @@
 }
 
 :root {
-  --forest-ink: #09352e;   /* body text, icons, curves */
+  --forest-ink: #111;      /* text, icons, curves: black (name kept from the style reference's Forest Ink, originally #09352e) */
   --bone-white: #ffffff;   /* card surface */
   --sage-paper: #e0e0e0;   /* canvas */
   --ash-gray: #e5e5e5;     /* recessed surface inside cards */
@@ -40,13 +40,20 @@
 
   --hairline: inset 0 0 0 0.5px var(--lichen);
   --radius-tag: 4px;
-  --radius-card: 12px;
+  --radius-card: var(--radius-panel);   /* buttons and boxes share the panel's corner radius */
 
   /* Pale surface and motion inside the dashboard panel (white paper). The spring overshoots slightly, then settles (iOS feel). */
   --mist: #f1f3f2;
   --radius-panel: 8px;   /* nearly square, only the corners blunted */
   --spring: cubic-bezier(.34, 1.36, .64, 1);
   --ease: cubic-bezier(.25, .8, .25, 1);
+
+  /* Glass materials, following HIG Materials (visionOS) usage: window = glass, sections (sidebar, groups) = regular,
+     selected items and buttons = thin. Apple publishes no numbers, so opacity and blur are approximations set by eye. */
+  --glass-edge: inset 0 1px 0 rgba(255,255,255,.75), inset 0 0 0 .5px rgba(255,255,255,.6);   /* top highlight + hairline edge */
+  --mat-thin: rgba(255,255,255,.38);
+  --mat-regular: rgba(255,255,255,.45);
+  --mat-window: rgba(255,255,255,.72);
 }
 
 * { box-sizing: border-box; }
@@ -58,9 +65,9 @@ body {
   letter-spacing: 0.012em;
   font-feature-settings: "liga" 0;
   color: var(--forest-ink);
-  background-color: #fff;
+  background-color: #f8f8f8;
 }
-/* Canvas: colour contours (topo.svg), green → yellow → orange with height, blurred like the iOS Control Center. Apple does not publish Liquid
+/* Canvas: greyscale contours (topo.svg), light when low (#F8F8F8) and dark when high (#6A6A6A), blurred like the iOS Control Center. Apple does not publish Liquid
    Glass blur values (HIG Materials: "blurs and adjusts the luminosity"), so these are set by eye. Negative inset hides the blurred edge. */
 body::before {
   content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
@@ -104,7 +111,7 @@ button {
   background: transparent;
   border: 0;
   box-shadow: inset 0 0 0 0.5px var(--forest-ink);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   padding: 8px 16px;
   font-weight: 500;
 }
@@ -194,21 +201,21 @@ nav .file { font-size: 12px; color: #111; padding-left: 6px; margin-bottom: 40px
 .tree { position: relative; list-style: none; margin: 0; padding: 0; }
 .tree::before { content: ""; position: absolute; left: 20px; top: 30px; bottom: 30px; width: 1px; background: var(--lichen); }   /* trunk │ */
 .pill { position: absolute; left: 0; right: 0; top: 0; height: 60px; list-style: none;
-  background: rgba(255,255,255,.62); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  border-radius: var(--radius-panel); box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: transform .5s var(--spring), height .45s var(--ease); }
+  background: var(--mat-thin); -webkit-backdrop-filter: blur(16px) saturate(180%); backdrop-filter: blur(16px) saturate(180%);
+  border-radius: var(--radius-panel); box-shadow: var(--glass-edge), 0 2px 10px rgba(0,0,0,.08); transition: transform .5s var(--spring), height .45s var(--ease); }
 .tree > li[data-v] { position: relative; z-index: 1; margin-bottom: 10px; }
 .tab { display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 22px 0 10px; font-size: 16px; font-weight: 400;
   color: #111; transition: color .25s; }
 .tab:hover { color: var(--forest-ink); text-decoration: none; }
-.tab .dot { width: 21px; height: 21px; border-radius: 50%; background: var(--sage-paper); box-shadow: inset 0 0 0 1px var(--lichen);
-  display: grid; place-items: center; font-size: 11px; flex: none; transition: background .3s, box-shadow .3s, transform .4s var(--spring); }
+/* Tab icons: a thin glass circle (blurs what is behind) with only the symbol in colour */
+.tab .dot { width: 21px; height: 21px; border-radius: 50%; background: var(--mat-thin); -webkit-backdrop-filter: blur(10px) saturate(180%); backdrop-filter: blur(10px) saturate(180%);
+  box-shadow: var(--glass-edge), 0 1px 3px rgba(0,0,0,.12); display: grid; place-items: center; font-size: 11px; flex: none; transition: background .3s, box-shadow .3s, transform .4s var(--spring); }
 .tab .num { font-size: 12px; color: #111; margin-left: auto; padding-left: 18px; font-variant-numeric: tabular-nums; font-weight: 400; }
 li.on > .tab { color: var(--forest-ink); font-weight: 500; }
-li.done .dot { background: var(--moss); box-shadow: none; }
-li.done .dot::after { content: "✓"; color: var(--bone-white); }
+li.done .dot::after { content: "✓"; color: var(--emerald); font-weight: 500; }
 /* Active tab: blue circle + white right arrow (placed after done ✓ so the arrow wins when both apply) */
-li.on .dot { background: var(--blue); box-shadow: none; transform: scale(1.1); }
-li.on .dot::after { content: ""; width: 11px; height: 11px; background: var(--bone-white);
+li.on .dot { transform: scale(1.1); }
+li.on .dot::after { content: ""; width: 11px; height: 11px; background: var(--blue);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h7M6 2.5 9.5 6 6 9.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
           mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6h7M6 2.5 9.5 6 6 9.5' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; }
 /* Sub-items (├──): expanded only under the selected tab (height eases from grid 0fr → 1fr) */
@@ -226,11 +233,22 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .sub ul li:last-child { padding-bottom: 14px; }
 
 /* Right content panel: the same white paper as the selection box. Cards and tables inside are set apart by a pale surface. */
-.panel { background: var(--bone-white); border-radius: var(--radius-panel); padding: 30px 32px 40px; min-width: 0; }
-.panel .card { background: var(--mist); box-shadow: none; border-radius: 6px; padding: 22px; }
-.panel .tablewrap { box-shadow: inset 0 0 0 1px var(--mist); border-radius: 6px; }
-.panel h2 { font-size: 24px; margin-bottom: 22px; }
-.panel .axis { font-size: 25px; }   /* Tab title ([ 03 · Dashboard ]) 1px larger than the h2 below it */
+/* Content panel = window (glass): the background shows through, with its range muted to keep content contrast. Boxes inside (except charts) = regular, each blurred.
+   The panel's glass surface lives in ::before. A backdrop-filter on the panel itself would make it a backdrop root,
+   so the inner boxes' blur would see only the panel surface, not the contour background. */
+.panel { position: relative; z-index: 0; box-shadow: var(--glass-edge), 0 8px 30px rgba(0,0,0,.08); border-radius: var(--radius-panel);
+  padding: 30px 32px 40px; min-width: 0; }
+.panel::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: var(--mat-window); -webkit-backdrop-filter: blur(40px) saturate(160%); backdrop-filter: blur(40px) saturate(160%); }
+.panel .card, .panel .tablewrap, .panel .howto, .panel .drop {
+  background: var(--mat-regular); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: var(--glass-edge), 0 2px 10px rgba(0,0,0,.05); border-radius: var(--radius-panel); }
+.panel .card { padding: 22px; }
+/* Table header: stays fixed and blurs the rows passing beneath (opaque white would float a white strip on the glass table) */
+.panel th { background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.panel h2 { font-size: 23px; margin-bottom: 22px; }
+.panel .axis { font-size: 25px; }   /* tab title (no number or brackets, e.g. "Age model") is 2px larger than the h2 below it, marking the h2 as a subheading */
+.view > .axis::before, .view > .axis::after { content: none; }
 .panel h3 { margin: 28px 0 12px; }
 .view { display: none; }
 .view.on { display: block; animation: view-in .45s var(--ease); }
@@ -242,13 +260,13 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .context b { color: var(--forest-ink); font-weight: 500; }
 
 /* Upload another file: drop area */
-.drop { display: grid; place-items: center; align-content: center; gap: 6px; height: 170px; border-radius: 18px; border: 1.5px dashed var(--lichen);
+.drop { display: grid; place-items: center; align-content: center; gap: 6px; height: 170px; border-radius: var(--radius-panel); border: 1.5px dashed var(--lichen);
   color: var(--slate-smoke); cursor: pointer; transition: border-color .25s, background .25s, transform .35s var(--spring); }
 .drop:hover, .drop.over { border-color: var(--moss); background: #f5faf6; transform: scale(1.01); }
 .drop b { color: var(--forest-ink); }
 
 /* Chart box */
-.plotbox { position: relative; background: var(--bone-white); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--mist); padding: 10px 12px 4px; min-width: 0; }
+.plotbox { position: relative; background: var(--bone-white); border-radius: var(--radius-panel); box-shadow: inset 0 0 0 1px var(--mist); padding: 10px 12px 4px; min-width: 0; }
 .plotbox.crowded { padding-top: 46px; }   /* narrow cell where the title overlaps the tool buttons: title goes below the button row */
 .plot { width: 100%; height: 380px; }
 .plot.tall { height: 420px; }
@@ -256,7 +274,7 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 
 /* Chart tools: magnifier −/+ · expand (instead of the default Plotly toolbar) */
 .ptools { position: absolute; top: 10px; right: 12px; z-index: 5; display: flex; gap: 4px; }
-.ptools button { width: 32px; height: 32px; padding: 0; border-radius: 10px; box-shadow: none; background: rgba(241,243,242,.85);
+.ptools button { width: 32px; height: 32px; padding: 0; border-radius: var(--radius-panel); box-shadow: none; background: rgba(241,243,242,.85);
   display: grid; place-items: center; transition: transform .35s var(--spring), background .2s; }
 .ptools button:hover { background: #e3e8e6; }
 .ptools button:active { transform: scale(.88); transition-duration: .1s; }
@@ -281,7 +299,7 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 
 /* Chart how-to (between the header and the charts) */
 .howto { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: 12px; color: var(--slate-smoke); background: var(--mist);
-  border-radius: 12px; padding: 9px 14px; margin: 0 0 14px; }
+  border-radius: var(--radius-panel); padding: 9px 14px; margin: 0 0 14px; }
 .howto b { color: var(--forest-ink); font-weight: 500; }
 .howto svg { width: 14px; height: 14px; vertical-align: -2px; color: var(--forest-ink); }
 .howto .dotdemo { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.38); vertical-align: -1px; }
