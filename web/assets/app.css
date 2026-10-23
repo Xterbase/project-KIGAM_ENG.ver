@@ -284,7 +284,6 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 
 /* Chart box */
 .plotbox { position: relative; background: var(--bone-white); border-radius: var(--radius-panel); box-shadow: inset 0 0 0 1px var(--mist); padding: 10px 12px 4px; min-width: 0; }
-.plotbox.crowded { padding-top: 46px; }   /* narrow cell where the title overlaps the tool buttons: title goes below the button row */
 .plot { width: 100%; height: 380px; }
 .plot.tall { height: 420px; }
 .plot .empty { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--slate-smoke); font-size: 12px; }
@@ -292,13 +291,14 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 /* Chart tools: magnifier −/+ · expand (instead of the default Plotly toolbar) */
 .ptools { position: absolute; top: 10px; right: 12px; z-index: 5; display: flex; gap: 4px; }
 /* Chart tools (magnifier, zoom in/out, expand): thin glass buttons; the chart lines beneath show through blurred. */
-.ptools button { width: 32px; height: 32px; padding: 0; border-radius: var(--radius-panel); background: var(--mat-thin);
+.ptools button { width: 26px; height: 26px; padding: 0; border-radius: var(--radius-panel); background: var(--mat-thin);
   -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%);
   box-shadow: var(--glass-edge), 0 2px 8px rgba(0,0,0,.1); display: grid; place-items: center; transition: transform .35s var(--spring), background .2s; }
 .ptools button:hover { background: rgba(255,255,255,.62); }
 .ptools button:active { transform: scale(.88); transition-duration: .1s; }
 .ptools svg, .howto svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.ptools svg { width: 17px; height: 17px; }
+.ptools svg { width: 15px; height: 15px; }
+.ptools svg .handle, .howto svg .handle { stroke-width: 3; }   /* thick handle, like Apple's magnifying glass */
 
 /* Axis guide shown only when zoomed: a thin solid line + a translucent black dot (drag to move) between the axis title and the tick labels.
    The element is 16px wide so it is easy to hit; the visible line is 1.5px in the middle. */

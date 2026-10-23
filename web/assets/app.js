@@ -16,13 +16,15 @@ const C = {
 // The default toolbar is hidden. Controls: drag = box zoom, double-click = reset; the only tools are the magnifier and expand buttons at the chart box's top right.
 const PC = { responsive: true, displaylogo: false, displayModeBar: false, doubleClick: 'reset', showTips: false };
 const AX = { gridcolor: C.line, griddash: 'dot', zeroline: false, linecolor: C.ink, linewidth: 0.5 };
-// Axis titles sit 30px from the tick labels (the zoom guide line goes in that gap). The left and bottom margins are wider to match.
+// Axis titles sit 30px from the tick labels (the zoom guide line goes in that gap). The bottom margin is wider to match.
+// The left margin uses automargin so the y-axis title sits at the chart's left edge (title left + 1px); fixed in plot().
 const ax = o => ({ ...AX, ...o, ...(typeof o.title === 'string' ? { title: { text: o.title, standoff: 30 } } : {}) });
 const BASE = {
-  margin: { l: 86, r: 18, t: 40, b: 70 }, font: { family: C.font, size: 12, color: C.ink },
+  margin: { l: 1, r: 18, t: 40, b: 70 }, font: { family: C.font, size: 12, color: C.ink },
   paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', legend: { orientation: 'h', y: -0.22 },
 };
-const title = text => ({ text, font: { size: 14 }, x: 0, xanchor: 'left' });
+// The title sits on the tool-button row (top left). fitTitle() shrinks it when long.
+const title = text => ({ text, font: { size: 14 }, x: 0, xanchor: 'left', y: 1, yref: 'container', yanchor: 'top', pad: { t: 4 } });
 
 const SIGMAB = { single_grain: 0.20, single_aliquot: 0.15 };  // 0.20: literature-backed, 0.15: legacy default (unconfirmed)
 const MODE_LABEL = { single_grain: 'Single grain', single_aliquot: 'Single aliquot' };
@@ -60,23 +62,30 @@ function plotMessage(div, msg) {
 
 // ---- Charts, shared: every draw goes through plot(). A new draw resets the zoom, so the ranges at that moment are remembered as the 'full range'.
 const ICON = {
-  zin: '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6"/></svg>',
-  zout: '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M7.5 10.5h6"/></svg>',
+  // Redrawn after the proportions of Apple SF Symbols' plus/minus.magnifyingglass (large lens, short thick handle). The originals may not be used on the web under their license.
+  zin: '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path class="handle" d="M15.2 15.2 20.5 20.5"/><path d="M10 6.8v6.4M6.8 10h6.4"/></svg>',
+  zout: '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path class="handle" d="M15.2 15.2 20.5 20.5"/><path d="M6.8 10h6.4"/></svg>',
   exp: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',   // ↗↙ expand
   shr: '<svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',    // ↙↗ restore size
 };
 const gdOf = d => typeof d === 'string' ? $(d) : d;
 // The legend goes below the x-axis title (78px from the axis). Plotly positions legends as a fraction of the plot height, so it is recomputed per height.
+// showlegend: 'big' = legend only in the enlarged view (hidden in the small cell).
 function legendLayout(gd) {
-  const on = gd._legend, b = on ? 124 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
+  const on = gd._legend === 'big' ? gd.parentElement.classList.contains('big') : gd._legend, b = on ? 124 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
   return { showlegend: on, 'margin.b': b, 'legend.y': -78 / h, 'legend.yanchor': 'top' };
 }
 function plot(div, data, layout) {
   const gd = gdOf(div);
-  gd._legend = layout.showlegend !== false;
+  gd._legend = layout.showlegend ?? true;
   const L = legendLayout(gd);
-  const p = Plotly.react(gd, data, { ...layout, showlegend: L.showlegend, margin: { ...BASE.margin, b: L['margin.b'] },
-    legend: { ...BASE.legend, y: L['legend.y'], yanchor: 'top' } }, PC);
+  Plotly.react(gd, data, { ...layout, showlegend: L.showlegend, margin: { ...BASE.margin, b: L['margin.b'] },
+    yaxis: { ...layout.yaxis, automargin: true }, legend: { ...BASE.legend, y: L['legend.y'], yanchor: 'top' } }, PC);
+  // Measure and fix the left margin so the y-axis title sits 1px inside the title (the chart's left edge); automargin alone is off by ±1px.
+  // Why fixed: tick label width changes on every zoom, which would shift the chart sideways.
+  // getBoundingClientRect clips text that runs off-screen at 0, so the left edge is computed from the box before the -90° rotation (getBBox).
+  const yt = gd.querySelector('.g-ytitle text'), dx = yt ? +yt.getAttribute('x') + yt.getBBox().y - +yt.getAttribute('y') : 1;
+  const p = Plotly.relayout(gd, { 'margin.l': gd._fullLayout._size.l + 1 - dx, 'yaxis.automargin': false });
   gd._home = { x: [...gd._fullLayout.xaxis.range], y: [...gd._fullLayout.yaxis.range] };
   if (!gd._track) addTools(gd);
   if (!gd._events) {
@@ -113,16 +122,13 @@ function addTools(gd) {
     dragThumb(gd, a);
   }
 }
-// If the title overlaps the tool buttons at the top right horizontally (narrow cell), widen the box top so the title drops below the button row.
-// The five dashboard cells must keep their titles level, so if any one overlaps, all move down.
-// Only horizontal positions are compared, so changing the top padding cannot flip the result.
+// If the title reaches the tool buttons at the top right (narrow cell), shrink its font to fit left of the buttons (min 10px).
 function fitTitle(gd) {
-  const box = gd.parentElement, dash = box.parentElement.classList.contains('dash') ? box.parentElement : null;
-  const boxes = dash ? [...dash.querySelectorAll(':scope > .plotbox')] : [box];
-  const over = b => { const t = b.querySelector('.gtitle'), tools = b.querySelector('.ptools');
-    return !!t && !!tools && t.getBoundingClientRect().right > tools.getBoundingClientRect().left - 6; };
-  const crowded = boxes.some(over);
-  boxes.forEach(b => b.classList.toggle('crowded', crowded));
+  const t = gd.querySelector('.gtitle'), tools = gd.parentElement.querySelector('.ptools');
+  if (!t || !tools) return;
+  t.style.fontSize = '14px';
+  const room = tools.getBoundingClientRect().left - 8 - t.getBoundingClientRect().left, w = t.getBoundingClientRect().width;
+  if (w > room) t.style.fontSize = Math.max(10, 14 * room / w) + 'px';
 }
 function hideAxes(gd) { if (gd._track) Object.values(gd._track).forEach(({ t, tip }) => { t.classList.remove('show'); tip.classList.remove('show'); }); }
 
@@ -489,7 +495,7 @@ async function drawDR(u, token) {
                 { type: 'line', x0: d.de, x1: d.de, y0: 0, y1: nat.lxtx, line: { color: C.natural, dash: 'dot', width: 1 } });
   }
   plot('dDR', traces, { ...BASE, shapes, title: title('Dose-response curve' + (d.de == null ? ' · no De' : '')),
-    xaxis: ax({ title: 'Regeneration dose (s)', rangemode: 'tozero' }), yaxis: ax({ title: 'Lx/Tx', rangemode: 'tozero' }) }, PC);
+    xaxis: ax({ title: 'Regeneration dose (s)', rangemode: 'tozero' }), yaxis: ax({ title: 'Lx/Tx', rangemode: 'tozero' }), showlegend: 'big' }, PC);
 }
 
 function drawHist(u) {
