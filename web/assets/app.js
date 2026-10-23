@@ -16,11 +16,11 @@ const C = {
 // The default toolbar is hidden. Controls: drag = box zoom, double-click = reset; the only tools are the magnifier and expand buttons at the chart box's top right.
 const PC = { responsive: true, displaylogo: false, displayModeBar: false, doubleClick: 'reset', showTips: false };
 const AX = { gridcolor: C.line, griddash: 'dot', zeroline: false, linecolor: C.ink, linewidth: 0.5 };
-// Axis titles sit 30px from the tick labels (the zoom guide line goes in that gap). The bottom margin is wider to match.
+// Axis titles: 13px bold, 1px larger than the tick labels (12px), only 4px from the tick labels (chart area first).
 // The left margin uses automargin so the y-axis title sits at the chart's left edge (title left + 1px); fixed in plot().
-const ax = o => ({ ...AX, ...o, ...(typeof o.title === 'string' ? { title: { text: o.title, standoff: 30 } } : {}) });
+const ax = o => ({ ...AX, ...o, ...(typeof o.title === 'string' ? { title: { text: o.title, standoff: 4, font: { size: 13, weight: 'bold' } } } : {}) });
 const BASE = {
-  margin: { l: 1, r: 18, t: 40, b: 70 }, font: { family: C.font, size: 12, color: C.ink },
+  margin: { l: 1, r: 18, t: 40, b: 42 }, font: { family: C.font, size: 12, color: C.ink },
   paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', legend: { orientation: 'h', y: -0.22 },
 };
 // The title sits on the tool-button row (top left). fitTitle() shrinks it when long.
@@ -69,11 +69,16 @@ const ICON = {
   shr: '<svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',    // ↙↗ restore size
 };
 const gdOf = d => typeof d === 'string' ? $(d) : d;
-// The legend goes below the x-axis title (78px from the axis). Plotly positions legends as a fraction of the plot height, so it is recomputed per height.
+// The legend goes below the x-axis title (46px from the axis). Plotly positions legends as a fraction of the plot height, so it is recomputed per height.
 // showlegend: 'big' = legend only in the enlarged view (hidden in the small cell).
 function legendLayout(gd) {
-  const on = gd._legend === 'big' ? gd.parentElement.classList.contains('big') : gd._legend, b = on ? 124 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
-  return { showlegend: on, 'margin.b': b, 'legend.y': -78 / h, 'legend.yanchor': 'top' };
+  const on = gd._legend === 'big' ? gd.parentElement.classList.contains('big') : gd._legend, b = on ? 96 : BASE.margin.b, h = Math.max(120, (gd.clientHeight || 380) - BASE.margin.t - b);
+  return { showlegend: on, 'margin.b': b, 'legend.y': -46 / h, 'legend.yanchor': 'top' };
+}
+// Small dashboard cells get a square chart area (inside the axes): cell height = area width + top and bottom margins. Enlarged view and other charts keep their CSS height.
+function squareH(gd, l = gd._fullLayout.margin.l) {
+  const small = gd.parentElement.parentElement.classList.contains('dash') && !gd.parentElement.classList.contains('big');
+  gd.style.height = small ? Math.round(gd.clientWidth - l - BASE.margin.r + BASE.margin.t + legendLayout(gd)['margin.b']) + 'px' : '';
 }
 function plot(div, data, layout) {
   const gd = gdOf(div);
@@ -85,7 +90,9 @@ function plot(div, data, layout) {
   // Why fixed: tick label width changes on every zoom, which would shift the chart sideways.
   // getBoundingClientRect clips text that runs off-screen at 0, so the left edge is computed from the box before the -90° rotation (getBBox).
   const yt = gd.querySelector('.g-ytitle text'), dx = yt ? +yt.getAttribute('x') + yt.getBBox().y - +yt.getAttribute('y') : 1;
-  const p = Plotly.relayout(gd, { 'margin.l': gd._fullLayout._size.l + 1 - dx, 'yaxis.automargin': false });
+  const l = gd._fullLayout._size.l + 1 - dx;
+  squareH(gd, l);
+  const p = Plotly.relayout(gd, { 'margin.l': l, 'yaxis.automargin': false, autosize: true });
   gd._home = { x: [...gd._fullLayout.xaxis.range], y: [...gd._fullLayout.yaxis.range] };
   if (!gd._track) addTools(gd);
   if (!gd._events) {
@@ -227,6 +234,7 @@ function toggleBig(box) {
     const e = b.querySelector('.ptools .exp'), big = b.classList.contains('big');
     if (e) { e.innerHTML = ICON[big ? 'shr' : 'exp']; e.title = big ? 'Restore size' : 'Expand'; }
     const gd = b.querySelector('.plot');
+    if (gd.data) squareH(gd);
     if (gd.data) Plotly.Plots.resize(gd).then(() => Plotly.relayout(gd, legendLayout(gd)));   // place the legend only after drawing at the new height
   });
   if (run) drawRadial(U()[sel]);   // radial arcs are recomputed for the area size
@@ -512,7 +520,7 @@ function drawHist(u) {
     hovertemplate: '%{customdata} s: %{y}<extra>' + name + '</extra>' });
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
   plot('dHist', [bar(no, `Reject (${no.length})` + (noDe ? ` · ${noDe} without De excluded` : ''), C.fail), bar(ok, `Accept (${ok.length})`, C.pass)],
-    { ...BASE, barmode: 'stack', shapes, title: title('Histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }) }, PC);
+    { ...BASE, barmode: 'stack', shapes, title: title('Histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Count' }), showlegend: 'big' }, PC);
 }
 
 // Weighted histogram (Analyst's Weighted histogram): one unit-area Gaussian per accepted De (width = its De error), summed.
@@ -527,7 +535,7 @@ function drawWHist(u) {
   const shapes = u.de == null ? [] : [{ type: 'line', x0: u.de, x1: u.de, y0: 0, y1: 1, yref: 'paper', line: { color: C.ink, width: 1.5, dash: 'dash' } }];
   plot('dWHist', [{ x, y, mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(0,158,115,0.15)', line: { color: C.pass, width: 1.5 },
     name: `Accept (${P.length})`, hovertemplate: '%{x:.0f} s: %{y:.3g}<extra></extra>' }],
-    { ...BASE, shapes, title: title('Weighted histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Density (1/s)', rangemode: 'tozero' }) });
+    { ...BASE, shapes, title: title('Weighted histogram'), xaxis: ax({ title: 'De (s)' }), yaxis: ax({ title: 'Density (1/s)', rangemode: 'tozero' }), showlegend: 'big' });
 }
 
 // Radial plot. Each line from the origin is one De value (slope = log De − log central value).
@@ -543,7 +551,7 @@ function drawRadial(u) {
   const ticks = []; for (let v = Math.max(step, Math.floor(lo / step) * step); v <= Math.ceil(hi / step) * step + 1e-9; v += step) ticks.push(v);
   const selPt = run.dec[sel] ? P.findIndex(p => Math.abs(p.de - u.de) < 1e-6) : -1;
   const layout = Y => ({ ...BASE, title: title('Radial plot'),
-    xaxis: ax({ title: 'Precision (1/relative error)', range: [0, X] }), yaxis: ax({ title: 'Standardized distance', range: [-Y, Y] }) });
+    xaxis: ax({ title: 'Precision (1/relative error)', range: [0, X] }), yaxis: ax({ title: 'Standardized distance', range: [-Y, Y] }), showlegend: 'big' });
   const pts = { x: P.map(p => p.radial_x), y: P.map(p => p.radial_y), mode: 'markers', name: 'Accepted De', marker: { color: C.pass, size: 9 },
     text: P.map(p => `De ${fmt(p.de)} ± ${fmt(p.de_error)} s`), hovertemplate: '%{text}<extra></extra>' };
   let Y = Math.max(3, ...P.map(p => Math.abs(p.radial_y))) * 1.15;
@@ -675,6 +683,6 @@ fillGrains();
 go(location.hash.slice(1));
 document.fonts.ready.then(() => go(location.hash.slice(1)));   // the font swap changes tab and button widths, so realign
 let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
-  document.querySelectorAll('.plot').forEach(gd => { if (gd.data) Plotly.relayout(gd, legendLayout(gd)); });   // recompute the legend position when the chart height changes
+  document.querySelectorAll('.plot').forEach(gd => { if (gd.data) { squareH(gd); Plotly.relayout(gd, { ...legendLayout(gd), autosize: true }); } });   // when the width changes, recompute the square height and the legend position
   if (run && tab === 'calc') drawRadial(U()[sel]);
 }, 150); });
