@@ -309,10 +309,11 @@ function renderFile() {
   // Pick the columns to show in the box below and add them to the record table, as in Analyst. Fields missing from the file (older inspect.json) are left out of the list.
   const pick = $('cols'), on = new Set(['position', 'grain']);
   COLS.filter(([k]) => k in I.records[0] && (SG || k !== 'grain')).forEach(([k, name]) => {
-    const b = el('button', name, 'chip-col'); b.type = 'button'; b.classList.toggle('on', on.has(k));
-    b.onclick = () => { on.has(k) ? on.delete(k) : on.add(k); b.classList.toggle('on'); drawRecs(); };
-    pick.append(b);
+    const c = el('input'), l = el('label'); c.type = 'checkbox'; c.checked = on.has(k); c.dataset.k = k;
+    c.onchange = () => { c.checked ? on.add(k) : on.delete(k); drawRecs(); };
+    l.append(c, name); pick.append(l);
   });
+  $('colsNone').onclick = () => { on.clear(); pick.querySelectorAll('input').forEach(c => { c.checked = false; }); drawRecs(); };
   // shortcut: draws every record into the DOM (882 is instant); files with tens of thousands need pagination
   function drawRecs() {
     const cols = [['record_index', 'Rec.#'], ...COLS.filter(([k]) => on.has(k))], t = $('discs'), h = el('tr');

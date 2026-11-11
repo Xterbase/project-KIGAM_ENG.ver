@@ -70,7 +70,10 @@ if ($meta === null || $inspect === null) {
       <div class="card facts" id="facts"></div>
       <h3>Records</h3>
       <div class="tablewrap"><table id="discs"></table></div>
-      <div class="card cols"><span class="note">Columns to show · click to add/remove</span><div id="cols"></div></div>
+      <div class="card cols">
+        <div class="headrow"><span class="note">Columns to show · check to add to the table</span><button class="btn" type="button" id="colsNone">Deselect all</button></div>
+        <div id="cols"></div>
+      </div>
 
       <h3 id="uplist">Recent uploads (latest 10 files)</h3>
       <?php sample_table(list_samples(), $id); ?>
