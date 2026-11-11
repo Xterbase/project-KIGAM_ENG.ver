@@ -195,7 +195,12 @@ table.samples td.memo { max-width: 220px; overflow: hidden; text-overflow: ellip
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
 .facts span { display: block; color: var(--slate-smoke); font-size: 11px; }
 .facts b { display: block; font-size: 18px; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
-#facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }   /* Uploaded file info: 2 rows × 4 columns */
+#facts { grid-template-columns: repeat(7, minmax(0, 1fr)); }   /* Uploaded file info: 1 row × 7 columns */
+/* Column picker for the record table (attached right below it) */
+.cols { margin-top: 8px; display: grid; gap: 8px; }
+#cols { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-col { padding: 4px 10px; border-radius: var(--radius-panel); font-size: 12px; color: var(--forest-ink); background: rgba(120,120,128,.1); }
+.chip-col.on { background: var(--forest-ink); color: var(--bone-white); }
 #facts > .note { grid-column: 1 / -1; }
 /* A button at the right end of a heading row (Upload another file) */
 .headrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
@@ -288,9 +293,9 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .plot.tall { height: 420px; }
 .plot .empty { display: flex; height: 100%; align-items: center; justify-content: center; color: var(--slate-smoke); font-size: 12px; }
 
-/* Chart tools: magnifier −/+ · expand (instead of the default Plotly toolbar) */
+/* Chart tools: expand · save PNG (instead of the default Plotly toolbar) */
 .ptools { position: absolute; top: 10px; right: 12px; z-index: 5; display: flex; gap: 4px; }
-/* Chart tools (magnifier, zoom in/out, expand): thin glass buttons; the chart lines beneath show through blurred. */
+/* Chart tools (expand, save): thin glass buttons; the chart lines beneath show through blurred. */
 .ptools button { width: 26px; height: 26px; padding: 0; border-radius: var(--radius-panel); background: var(--mat-thin);
   -webkit-backdrop-filter: blur(12px) saturate(180%); backdrop-filter: blur(12px) saturate(180%);
   box-shadow: var(--glass-edge), 0 2px 8px rgba(0,0,0,.1); display: grid; place-items: center; transition: transform .35s var(--spring), background .2s; }
@@ -298,7 +303,6 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 .ptools button:active { transform: scale(.88); transition-duration: .1s; }
 .ptools svg, .howto svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .ptools svg { width: 15px; height: 15px; }
-.ptools svg .handle, .howto svg .handle { stroke-width: 3; }   /* thick handle, like Apple's magnifying glass */
 
 /* Axis guide shown only when zoomed: a thin solid line + a translucent black dot (drag to move) between the axis title and the tick labels.
    The element is 16px wide so it is easy to hit; the visible line is 1.5px in the middle. */
@@ -333,6 +337,9 @@ li.on .sub li:nth-child(4) a { transition-delay: .15s; }
 
 .selbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 20px; }
 .selbar .big { font-size: 20px; font-weight: 500; }
+/* Fix the unit name and verdict text to the width of the longest case (Disc 48 · Grain 100 / manual change + warning) so Next, Accept and Reject do not move from unit to unit */
+#selTitle { width: 10em; }
+#selDetail { width: 42.5em; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Accept is always green, Reject always red. A black border only at the moment of pressing (.hit: also for the keyboard) */
 button.btn#accBtn, button.btn#rejBtn { color: #fff; }
 button.btn#accBtn { background: color-mix(in srgb, var(--pass) 85%, transparent); }

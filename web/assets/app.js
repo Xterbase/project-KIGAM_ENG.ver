@@ -13,7 +13,7 @@ const C = {
   ink: css('--forest-ink'), pass: css('--pass'), fail: css('--fail'), fit: css('--muted-sage'), data: css('--emerald'),
   natural: css('--indigo-accent'), muted: css('--slate-smoke'), line: css('--lichen'), moss: css('--moss'), font: css('--font'),
 };
-// The default toolbar is hidden. Controls: drag = box zoom, double-click = reset; the only tools are the magnifier and expand buttons at the chart box's top right.
+// The default toolbar is hidden. Controls: drag = box zoom, double-click = reset; the only tools are the expand and save-PNG buttons at the chart box's top right.
 const PC = { responsive: true, displaylogo: false, displayModeBar: false, doubleClick: 'reset', showTips: false };
 const AX = { gridcolor: C.line, griddash: 'dot', zeroline: false, linecolor: C.ink, linewidth: 0.5 };
 // Axis titles: 13px bold, 1px larger than the tick labels (12px), only 4px from the tick labels (chart area first).
@@ -62,9 +62,7 @@ function plotMessage(div, msg) {
 
 // ---- Charts, shared: every draw goes through plot(). A new draw resets the zoom, so the ranges at that moment are remembered as the 'full range'.
 const ICON = {
-  // Redrawn after the proportions of Apple SF Symbols' plus/minus.magnifyingglass (large lens, short thick handle). The originals may not be used on the web under their license.
-  zin: '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path class="handle" d="M15.2 15.2 20.5 20.5"/><path d="M10 6.8v6.4M6.8 10h6.4"/></svg>',
-  zout: '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path class="handle" d="M15.2 15.2 20.5 20.5"/><path d="M6.8 10h6.4"/></svg>',
+  save: '<svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 17v3h16v-3"/></svg>',   // ↓ save PNG
   exp: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',   // ↗↙ expand
   shr: '<svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',    // ↙↗ restore size
 };
@@ -109,17 +107,16 @@ const rangeOf = (gd, a) => [...gd._fullLayout[a + 'axis'].range];
 const isZoomed = (gd, a) => { if (gd._fullLayout[a + 'axis'].autorange) return false;   // autorange = not zoomed
   const h = gd._home[a], c = rangeOf(gd, a), e = (h[1] - h[0]) * 1e-3; return c[0] > h[0] + e || c[1] < h[1] - e; };
 
-// Adds the tool buttons (magnifier −/+, plus expand on the five dashboard cells) and the two axis zoom guides to a chart box, once.
+// Attach the tool buttons (expand on the five dashboard cells, save PNG on every chart) and the zoom guides for both axes to the chart box, once.
 function addTools(gd) {
   const box = gd.parentElement, tools = el('div', null, 'ptools');
   const btn = (k, tip, fn) => { const b = el('button', null, k); b.type = 'button'; b.innerHTML = ICON[k]; b.title = tip; b.onclick = fn; tools.append(b); return b; };
-  btn('zout', 'Zoom out', () => zoomBy(gd, 1.6));
-  btn('zin', 'Zoom in (around the centre)', () => zoomBy(gd, 1 / 1.6));
   if (box.parentElement.classList.contains('dash')) {
     btn('exp', 'Expand', () => toggleBig(box));
     // Remember whether the chart was zoomed just before a double-click (by the double-click event Plotly has already reset the range). Used by plotly_doubleclick in plot().
     box.addEventListener('mousedown', () => { gd._wasZoomed = !!gd._home && (isZoomed(gd, 'x') || isZoomed(gd, 'y')); }, true);
   }
+  btn('save', 'Save as PNG', () => savePng(gd));
   box.append(tools);
   gd._track = {};
   for (const a of ['x', 'y']) {
@@ -212,16 +209,12 @@ function tween(gd, to) {
   requestAnimationFrame(step);
 }
 
-// Magnifier: scale by f around the centre of the visible area. Stops at the full range when it would go beyond it.
-function zoomBy(gd, f) {
+// Save PNG: the current range and size as shown, white background (transparent on screen), 2× resolution. File name = sample file_chart title.
+function savePng(gd) {
   if (!gd.data) return;
-  const to = {};
-  for (const a of ['x', 'y']) {
-    const h = gd._home[a], c = rangeOf(gd, a), mid = (c[0] + c[1]) / 2, w = Math.min((c[1] - c[0]) * f, h[1] - h[0]);
-    const lo = Math.min(Math.max(mid - w / 2, h[0]), h[1] - w);
-    to[a] = [lo, lo + w];
-  }
-  tween(gd, to);
+  const name = (B.file.replace(/\.[^.]+$/, '') + '_' + (gd.layout.title?.text || gd.id)).replace(/<[^>]+>/g, '').replace(/[^\w가-힣.-]+/g, '_');
+  Plotly.downloadImage({ data: gd.data, layout: { ...gd.layout, paper_bgcolor: '#fff', plot_bgcolor: '#fff' } },
+    { format: 'png', width: gd.clientWidth, height: gd.clientHeight, scale: 2, filename: name });
 }
 
 // Expand: the other four in one row of four on top, the chosen chart full width below them. The rearrangement is animated with FLIP.
@@ -255,8 +248,8 @@ document.querySelectorAll('.howto').forEach(h => h.innerHTML =
   '<span><b>Drag</b> zoom into that region</span>' +
   '<span>While zoomed, drag the <span class="dotdemo"></span> dot between the axis title and the ticks to move</span>' +
   '<span><b>Double-click</b> reset</span>' +
-  `<span>${ICON.zout}${ICON.zin} zoom out / in around the centre</span>` +
-  (h.nextElementSibling.classList.contains('dash') ? `<span>${ICON.exp} expand (the chosen chart opens large below · double-click or Esc to go back)</span>` : ''));
+  (h.nextElementSibling.classList.contains('dash') ? `<span>${ICON.exp} expand (the chosen chart opens large below · double-click or Esc to go back)</span>` : '') +
+  `<span>${ICON.save} save as PNG</span>`);
 
 // ---- Things available directly from the file layout
 const byDisc = {};
@@ -306,20 +299,46 @@ function renderContext() {
 
 // ---- 01 File
 function renderFile() {
-  // 2 rows × 4 columns: row 1 is the file itself, row 2 its layout
-  const facts = [[B.file, 'File'], [SG ? 'single-grain' : 'single-aliquot', 'Measurement mode'], [NCH, 'Channels (OSL)'], [I.object_name || '—', 'RDA object'],
+  // 1 row × 7 columns
+  const facts = [[B.file, 'File'], [SG ? 'single-grain' : 'single-aliquot', 'Measurement mode'], [NCH, 'Channels (OSL)'],
     [I.n_positions, 'Discs'], [SG ? I.grains.length : '—', 'Grains'], [I.records.length, 'Records'], [arr(I.record_types).join(', '), 'Record types']];
   facts.forEach(([v, k]) => { const d = el('div'); d.append(el('span', k), el('b', v)); $('facts').append(d); });
   $('reupBtn').onclick = () => { $('upForm').hidden = false; $('reupBtn').hidden = true; };   // show the drop zone again in its initial state
   if (arr(I.ignored_objects).length) $('facts').append(el('p', `Other objects in the RDA (${arr(I.ignored_objects).join(', ')}) are not used.`, 'note'));
 
-  const t = $('discs'), h = el('tr'); ['Disc', 'Grains', 'Grain numbers'].forEach(x => h.append(el('th', x))); t.append(h);
-  Object.entries(byDisc).forEach(([p, gs]) => {
-    const r = el('tr');
-    [p, SG ? gs.length : '—', SG ? gs.join(', ') : 'Measured per disc'].forEach(x => r.append(el('td', x)));
-    t.append(r);
+  // Pick the columns to show in the box below and add them to the record table, as in Analyst. Fields missing from the file (older inspect.json) are left out of the list.
+  const pick = $('cols'), on = new Set(['position', 'grain']);
+  COLS.filter(([k]) => k in I.records[0] && (SG || k !== 'grain')).forEach(([k, name]) => {
+    const b = el('button', name, 'chip-col'); b.type = 'button'; b.classList.toggle('on', on.has(k));
+    b.onclick = () => { on.has(k) ? on.delete(k) : on.add(k); b.classList.toggle('on'); drawRecs(); };
+    pick.append(b);
   });
+  // shortcut: draws every record into the DOM (882 is instant); files with tens of thousands need pagination
+  function drawRecs() {
+    const cols = [['record_index', 'Rec.#'], ...COLS.filter(([k]) => on.has(k))], t = $('discs'), h = el('tr');
+    cols.forEach(([, name]) => h.append(el('th', name))); t.replaceChildren(h);
+    I.records.forEach((rec, i) => { const r = el('tr'); cols.forEach(([k]) => r.append(el('td', k === 'record_index' ? i + 1 : rec[k] ?? '—'))); t.append(r); });
+  }
+  drawRecs();
 }
+// Columns that can be added to the table: same names and order as Analyst's Display Information list. Values are the inspect records' BIN fields (read_BIN2R) as is.
+// Integral 1–4 are missing because read_BIN2R does not read them. Fields absent in the file's version are dropped from the list in renderFile().
+const COLS = [['position', 'Position'], ['grain', 'Grain number'], ['run', 'Run Number'], ['set', 'Set Number'], ['dtype', 'Data Type'],
+  ['irr_time', 'Irrad. Time'], ['npoints', 'Num. Points'], ['ltype', 'Lumin. Type'], ['low', 'Low'], ['high', 'High'], ['rate', 'Rate'],
+  ['temperature', 'Temperature'], ['xcoord', 'X Coordinate'], ['ycoord', 'Y Coordinate'], ['toldelay', 'Chn. Delay'], ['tolon', 'Chn. On'],
+  ['toloff', 'Chn. off'], ['sample', 'Sample'], ['comment', 'Comment'], ['lightsource', 'Light Source'], ['lpower', 'Light Power'],
+  ['version', 'Version'], ['length', 'Length'], ['previous', 'Previous'], ['time', 'Time'], ['date', 'Date'], ['sequence', 'Sequence'],
+  ['user', 'User'], ['systemid', 'System ID'], ['irr_type', 'Irrad. Type'], ['irr_doserate', 'Irrad. Dose Rate'], ['bl_time', 'Bleach Time'],
+  ['bl_unit', 'Bleach Unit'], ['an_temp', 'Anneal Temp'], ['an_time', 'Anneal Time'], ['norm1', 'Normal. 1'], ['norm2', 'Normal. 2'],
+  ['norm3', 'Normal. 3'], ['bg', 'Background'], ['shift', 'Shift'], ['curveno', 'Curve No'], ['timetick', 'TimeTick'], ['ontime', 'On time'],
+  ['stimperiod', 'Stimulation Period'], ['gate_start', 'Gating start'], ['gate_stop', 'Gating end'], ['ptenabled', 'Photon Timer enabled'],
+  ['gate_enabled', 'PMT gating enabled'], ['timesinceirr', 'Time since Irr.'], ['deadtime', 'PMT dead time'],
+  ['maxlpower', 'Max. absolute stim. light power'], ['xrf_acqtime', 'XRF acquisition time'], ['xrf_hv', 'XRF X-ray high voltage'],
+  ['xrf_curr', 'XRF X-ray current'], ['xrf_deadtimef', 'XRF dead time fraction'], ['dtenabled', 'Dead time correction enabled'],
+  ['irr_doserateerr', 'Irrad. Dose Rate error'], ['detector_id', 'Detection unit'], ['lowerfilter_id', 'Filter 1'], ['upperfilter_id', 'Filter 2'],
+  ['enoisefactor', 'Excess noise factor'], ['markpos_x1', 'Marker 1 X'], ['markpos_y1', 'Marker 1 Y'], ['markpos_x2', 'Marker 2 X'],
+  ['markpos_y2', 'Marker 2 Y'], ['markpos_x3', 'Marker 3 X'], ['markpos_y3', 'Marker 3 Y'], ['rectype', 'Record type'],
+  ['extr_start', 'Extraction start'], ['extr_end', 'Extraction end']];
 
 // ---- Shared: draw a curve (signal integral as a moss-green band, background as a grey band)
 function drawCurve(div, c, text, sig, bg) {

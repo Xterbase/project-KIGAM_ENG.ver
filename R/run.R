@@ -47,11 +47,9 @@ suppressPackageStartupMessages({
     unit_key <- paste(meta$POSITION, meta$GRAIN)
     record_index <- ave(seq_len(nrow(meta)), unit_key, FUN = seq_along)
 
-    cols <- intersect(
-      c("ID", "POSITION", "GRAIN", "RUN", "SET", "LTYPE", "DTYPE", "IRR_TIME", "NPOINTS",
-        "LOW", "HIGH", "TEMPERATURE", "AN_TEMP", "AN_TIME", "LIGHTSOURCE", "SAMPLE", "COMMENT"),
-      colnames(meta)
-    )
+    # Pass every BIN header field (the upload tab lets the user pick columns, Analyst-style). Values exactly as read_BIN2R read them.
+    # SEL is Luminescence's selection flag (not a file field), an internal column, so it is dropped.
+    cols <- setdiff(colnames(meta), "SEL")
     records <- data.frame(record_index = record_index, meta[, cols, drop = FALSE])
     names(records) <- tolower(names(records))
 
